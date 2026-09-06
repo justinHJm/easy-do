@@ -1,6 +1,6 @@
 /**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
+ * 화면에서 공통으로 사용할 색상을 모읍니다. 같은 의미의 색상을 한곳에서 관리해 일관성을 유지합니다.
+ * 밝은 모드와 어두운 모드 정의가 남아 있지만, 현재 useTheme는 밝은 모드만 사용합니다.
  */
 
 import '@/global.css';

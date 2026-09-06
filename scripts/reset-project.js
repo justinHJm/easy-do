@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
 /**
- * This script is used to reset the project to a blank state.
- * It deletes or moves the /src and /scripts directories to /example based on user input and creates a new /src/app directory with an index.tsx and _layout.tsx file.
- * You can remove the `reset-project` script from package.json and safely delete this file after running it.
+ * Expo 예제 프로젝트를 빈 상태로 되돌리는 도구입니다. 현재 앱 기능을 실행하는 파일은 아닙니다.
+ * 선택에 따라 src와 scripts를 example로 옮기거나 삭제한 뒤, src/app에 새 화면과 레이아웃을 만듭니다.
+ * 실행하면 작성한 앱 코드도 초기화 대상이 됩니다. 초기화 도구가 더 필요 없다면 실행 명령과 이 파일을 함께 정리할 수 있습니다.
  */
 
 const fs = require("fs");
@@ -50,12 +50,12 @@ const rl = readline.createInterface({
 const moveDirectories = async (userInput) => {
   try {
     if (userInput === "y") {
-      // Create the app-example directory
+      // 기존 코드를 보관하기로 선택한 경우 이동할 example 폴더를 먼저 준비합니다.
       await fs.promises.mkdir(exampleDirPath, { recursive: true });
       console.log(`📁 /${exampleDir} directory created.`);
     }
 
-    // Move old directories to new app-example directory or delete them
+    // 사용자 선택에 따라 기존 폴더를 보관하거나 삭제합니다. 파일 작업 완료를 기다린 뒤 다음 단계로 진행합니다.
     for (const dir of oldDirs) {
       const oldDirPath = path.join(root, dir);
       if (fs.existsSync(oldDirPath)) {
@@ -72,17 +72,17 @@ const moveDirectories = async (userInput) => {
       }
     }
 
-    // Create new /src/app directory
+    // 기존 폴더 처리 후 새 화면 파일이 들어갈 src/app 경로를 준비합니다.
     const newAppDirPath = path.join(root, newAppDir);
     await fs.promises.mkdir(newAppDirPath, { recursive: true });
     console.log("\n📁 New /src/app directory created.");
 
-    // Create index.tsx
+    // 위에 정의한 초기 화면 코드를 파일로 기록해 새 프로젝트가 바로 열리게 합니다.
     const indexPath = path.join(newAppDirPath, "index.tsx");
     await fs.promises.writeFile(indexPath, indexContent);
     console.log("📄 src/app/index.tsx created.");
 
-    // Create _layout.tsx
+    // 초기 화면을 Expo Router에 연결할 레이아웃 코드도 함께 기록합니다.
     const layoutPath = path.join(newAppDirPath, "_layout.tsx");
     await fs.promises.writeFile(layoutPath, layoutContent);
     console.log("📄 src/app/_layout.tsx created.");

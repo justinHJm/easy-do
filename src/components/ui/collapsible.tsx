@@ -9,6 +9,7 @@ import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 export function Collapsible({ children, title }: PropsWithChildren & { title: string }) {
+  // 펼침 상태가 바뀌면 내용을 다시 표시합니다. 함수형 갱신으로 직전 상태를 기준으로 반전합니다.
   const [isOpen, setIsOpen] = useState(false);
   const theme = useTheme();
 

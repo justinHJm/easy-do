@@ -3,6 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 
 import AppTabs from '@/components/app-tabs';
 import { Colors } from '@/constants/theme';
+import { TodoProvider } from '@/contexts/todo-context';
 
 const theme = {
   ...DefaultTheme,
@@ -20,7 +21,9 @@ export default function TabLayout() {
   return (
     <ThemeProvider value={theme}>
       <StatusBar style="dark" />
-      <AppTabs />
+      <TodoProvider>
+        <AppTabs />
+      </TodoProvider>
     </ThemeProvider>
   );
 }

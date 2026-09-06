@@ -9,6 +9,7 @@ const INITIAL_SCALE_FACTOR = Dimensions.get('screen').height / 90;
 const DURATION = 600;
 
 export function AnimatedSplashOverlay() {
+  // 보관된 Expo 예제입니다. 애니메이션 시작 여부와 표시 여부를 분리해 끝난 화면을 제거합니다.
   const [animate, setAnimate] = useState(false);
   const [visible, setVisible] = useState(true);
 
@@ -40,6 +41,7 @@ export function AnimatedSplashOverlay() {
       entering={splashKeyframe.duration(DURATION).withCallback((finished) => {
         'worklet';
         if (finished) {
+          // 애니메이션 작업 영역에서 React 상태를 직접 바꾸지 않고 React 실행 영역으로 요청을 전달합니다.
           scheduleOnRN(setVisible, false);
         }
       })}
@@ -49,6 +51,7 @@ export function AnimatedSplashOverlay() {
   ) : (
     <View
       onLayout={() => {
+        // 화면 배치가 끝난 뒤 시작 화면을 숨깁니다. 성공·실패와 관계없이 finally에서 애니메이션을 시작합니다.
         SplashScreen.hideAsync().finally(() => {
           setAnimate(true);
         });
