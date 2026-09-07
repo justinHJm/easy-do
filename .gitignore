@@ -33,6 +33,37 @@ yarn-error.*
 # local env files
 .env*.local
 
+# 인증정보와 로컬 설정 (예제 환경변수 파일도 실제 값을 넣지 않음)
+.env
+.env.*
+!.env.example
+!.env.sample
+.npmrc
+.netrc
+.git-credentials
+credentials.json
+service-account*.json
+google-services.json
+GoogleService-Info.plist
+*.keystore
+*.pfx
+*.jceks
+local.properties
+*.local.json
+.claude/settings.local.json
+.codex/auth.json
+.codex/sessions/
+
+# 기기 저장 데이터·빌드 결과·디버그 기록
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+*.apk
+*.aab
+*.log
+coverage/
+
 # typescript
 *.tsbuildinfo
 
