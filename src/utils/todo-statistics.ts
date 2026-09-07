@@ -39,18 +39,30 @@ export function getStatistics(data: TodoData, today: string) {
   const weekEnd = endOfWeek(today);
   const weekStart = addDays(weekEnd, -6);
   const dailyCounts = new Map<string, number>();
-  const priorityCounts: Record<TodoPriority, number> = { high: 0, normal: 0, low: 0 };
   for (const record of records) {
     // ISO 시각의 UTC 날짜를 자르지 않고 기기의 현지 날짜로 바꿔 자정 전후를 정확히 집계합니다.
     const day = dateKey(new Date(record.completedAt));
     dailyCounts.set(day, (dailyCounts.get(day) ?? 0) + 1);
-    priorityCounts[record.priority]++;
   }
   const lastSevenDays = Array.from({ length: 7 }, (_, index) => {
     const date = addDays(today, index - 6);
     return { date, count: dailyCounts.get(date) ?? 0 };
   });
   const weekDates = Array.from({ length: 7 }, (_, index) => addDays(weekStart, index));
+  // 전체 완료에는 루틴도 포함되므로 일반 Todo 통계는 같은 기록에서 별도로 추출합니다.
+  // 자정에 History로 옮겨도 완료 수는 유지되고, 완료 취소는 원본 변경 즉시 반영됩니다.
+  const todoRecords = records.filter((record) => record.kind === 'todo');
+  const pendingTodos = data.todos.filter((todo) => !todo.recurrence && !todo.completed);
+  const todos = {
+    todayCompleted: todoRecords.filter((record) => dateKey(new Date(record.completedAt)) === today).length,
+    weekCompleted: todoRecords.filter((record) => {
+      const day = dateKey(new Date(record.completedAt));
+      return day >= weekStart && day <= weekEnd;
+    }).length,
+    totalCompleted: todoRecords.length,
+    pending: pendingTodos.length,
+    overdue: pendingTodos.filter((todo) => todo.dueDate && todo.dueDate < today).length,
+  };
   const scheduled = new Set<string>();
   for (const todo of data.todos) {
     if (!todo.recurrence) continue;
@@ -72,7 +84,7 @@ export function getStatistics(data: TodoData, today: string) {
     total: records.length,
     todayCount: dailyCounts.get(today) ?? 0,
     weekCount: weekDates.reduce((sum, day) => sum + (dailyCounts.get(day) ?? 0), 0),
-    weekStart, weekEnd, lastSevenDays, priorityCounts,
+    weekStart, weekEnd, lastSevenDays, todos,
     routines: { completed: completed.size, scheduled: scheduled.size,
       rate: scheduled.size ? Math.round(completed.size / scheduled.size * 100) : 0 },
   };

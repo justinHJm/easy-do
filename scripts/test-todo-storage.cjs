@@ -323,10 +323,15 @@ test('Hook: 화면 해제 뒤 복원 결과로 저장하지 않음', async () =>
 });
 
 test('시작 화면: ready 전 탭 미생성, 오류 재시도, 첫 배치 후 네이티브 Splash 해제', async () => {
+  let elapsed = false; let effectStarted = false; let timerCallback; let cleanup; let timerCount = 0; let cleared = false;
   let state = 'loading'; let tabMounts = 0; let startupProps; let holds = 0; let hides = 0; let retryCount = 0;
   const element = (type, props) => ({ type, props });
   const pass = ({ children }) => children;
   const { default: Layout } = load('src/app/_layout.tsx', {
+    react: {
+      useState: () => [elapsed, (value) => { elapsed = value; }],
+      useEffect: (effect) => { if (!effectStarted) { effectStarted = true; cleanup = effect(); } },
+    },
     'react/jsx-runtime': { jsx: element, jsxs: element },
     'expo-router': { DefaultTheme: { colors: {} }, ThemeProvider: pass },
     'expo-status-bar': { StatusBar: () => null },
@@ -336,6 +341,9 @@ test('시작 화면: ready 전 탭 미생성, 오류 재시도, 첫 배치 후 �
     '@/components/app-startup': { AppStartup: (props) => { startupProps = props; return null; } },
     '@/constants/theme': { Colors: { light: {} } },
     '@/contexts/todo-context': { TodoProvider: pass, useTodoContext: () => ({ hydrationState: state, storageError: state === 'error' ? '읽기 실패' : null, retryStorage: () => retryCount++ }) },
+  }, {
+    setTimeout: (callback, delay) => { assert.equal(delay, 1000); timerCount++; timerCallback = callback; return 1; },
+    clearTimeout: () => { cleared = true; },
   });
   function render(node) {
     if (!node) return;
@@ -347,14 +355,18 @@ test('시작 화면: ready 전 탭 미생성, 오류 재시도, 첫 배치 후 �
   root.props.onLayout(); await tick(); assert.equal(hides, 1);
   state = 'error'; render(Layout()); assert.equal(tabMounts, 0); assert.equal(startupProps.error, '읽기 실패');
   startupProps.onRetry(); assert.equal(retryCount, 1);
+  state = 'ready'; render(Layout()); assert.equal(tabMounts, 0);
+  state = 'loading'; timerCallback(); render(Layout()); assert.equal(tabMounts, 0);
   state = 'ready'; render(Layout()); assert.equal(tabMounts, 1);
+  render(Layout()); assert.equal(tabMounts, 2); assert.equal(timerCount, 1);
+  cleanup(); assert.equal(cleared, true);
 });
 
 test('실제 완료 통계: 자정 이동 전후 동일·중복 제거·완료 취소·7일 0 포함·주 경계', () => {
   let data = reduce(core.emptyData(), { type: 'add', title: '오늘', priority: 'high' });
   data = reduce(data, { type: 'toggle', id: 1 });
   let result = stats.getStatistics(data, '2026-09-07');
-  assert.equal(result.todayCount, 1); assert.equal(result.weekCount, 1); assert.equal(result.priorityCounts.high, 1);
+  assert.equal(result.todayCount, 1); assert.equal(result.weekCount, 1); assert.equal(result.todos.todayCompleted, 1);
   assert.equal(result.lastSevenDays.length, 7); assert.equal(result.lastSevenDays[0].count, 0);
   assert.equal(result.weekStart, '2026-09-07'); assert.equal(result.weekEnd, '2026-09-13');
   const duplicate = { ...data, history: [{ ...data.todos[0] }] };
@@ -362,6 +374,32 @@ test('실제 완료 통계: 자정 이동 전후 동일·중복 제거·완료 �
   assert.equal(stats.getStatistics(core.rollover(data, '2026-09-08'), '2026-09-08').weekCount, 1);
   assert.equal(stats.getStatistics(reduce(data, { type: 'toggle', id: 1 }), '2026-09-07').total, 0);
   assert.equal(stats.getStatistics(core.rollover(data, '2026-09-14'), '2026-09-14').weekCount, 0);
+});
+
+test('일반 Todo 통계: 루틴 제외·기한 경계·History 이동·완료 취소·삭제 반영', () => {
+  let data = core.emptyData();
+  for (const title of ['완료', '지난 기한', '오늘 기한', '미래 기한', '기한 없음', '루틴']) {
+    data = reduce(data, { type: 'add', title });
+  }
+  for (const [id, dueDate] of [[2, '2026-09-06'], [3, '2026-09-07'], [4, '2026-09-08']]) {
+    data = reduce(data, { type: 'edit', id, changes: { ...data.todos[id - 1], dueDate } });
+  }
+  data = reduce(data, { type: 'edit', id: 6, changes: { title: '루틴', priority: 'normal', recurrence: { type: 'daily', startDate: '2026-09-07' } } });
+  data = reduce(reduce(data, { type: 'toggle', id: 1 }), { type: 'toggle', id: 6 });
+  assert.equal(stats.getStatistics(data, '2026-09-07').todayCount, 2);
+  assert.deepEqual(plain(stats.getStatistics(data, '2026-09-07').todos), {
+    todayCompleted: 1, weekCompleted: 1, totalCompleted: 1, pending: 4, overdue: 1,
+  });
+  const moved = core.rollover(data, '2026-09-08');
+  assert.deepEqual(plain(stats.getStatistics(moved, '2026-09-08').todos), {
+    todayCompleted: 0, weekCompleted: 1, totalCompleted: 1, pending: 4, overdue: 2,
+  });
+  const canceled = reduce(data, { type: 'toggle', id: 1 });
+  assert.equal(stats.getStatistics(canceled, '2026-09-07').todos.totalCompleted, 0);
+  assert.equal(stats.getStatistics(canceled, '2026-09-07').todos.pending, 5);
+  const deleted = reduce(data, { type: 'delete', id: 2 });
+  assert.equal(stats.getStatistics(deleted, '2026-09-07').todos.overdue, 0);
+  assert.equal(stats.getStatistics(core.emptyData(), '2026-09-07').todos.pending, 0);
 });
 
 test('루틴 통계: 현재 규칙 예정·삭제된 완료 보존·빈 분모·월말 회차', () => {

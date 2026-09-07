@@ -2,15 +2,12 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { CharacterGreeting } from '@/components/character-greeting';
-import { PriorityBadge } from '@/components/priority-badge';
 import { Colors, Spacing } from '@/constants/theme';
 import { useTodoContext } from '@/contexts/todo-context';
-import type { TodoPriority } from '@/types/todo';
 import { localDate } from '@/utils/due-date';
 import { getStatistics } from '@/utils/todo-statistics';
 
 const colors = Colors.light;
-const priorities: TodoPriority[] = ['high', 'normal', 'low'];
 const shortDate = (date: string) => `${Number(date.slice(5, 7))}/${Number(date.slice(8))}`;
 
 export default function StatsScreen() {
@@ -35,10 +32,10 @@ export default function StatsScreen() {
           </View>}
           {stats.total > 0 && <><View style={styles.summary}>
             <View style={[styles.card, styles.summaryCard]}>
-              <Text style={styles.note}>오늘 완료</Text><Text style={styles.number}>{stats.todayCount}<Text style={styles.unit}>개</Text></Text>
+              <Text style={styles.note}>전체 오늘 완료</Text><Text style={styles.number}>{stats.todayCount}<Text style={styles.unit}>개</Text></Text>
             </View>
             <View style={[styles.card, styles.summaryCard]}>
-              <Text style={styles.note}>이번 주 완료</Text><Text style={styles.number}>{stats.weekCount}<Text style={styles.unit}>개</Text></Text>
+              <Text style={styles.note}>전체 이번 주 완료</Text><Text style={styles.number}>{stats.weekCount}<Text style={styles.unit}>개</Text></Text>
             </View>
           </View>
           <Text style={styles.note}>이번 주 {shortDate(stats.weekStart)} ~ {shortDate(stats.weekEnd)} · 월요일~일요일</Text>
@@ -59,14 +56,20 @@ export default function StatsScreen() {
               })}
             </View>
           </View>
-          <View style={styles.card}>
-            <Text style={styles.heading}>우선순위별 완료</Text>
-            <Text style={styles.note}>전체 완료 기록 · {stats.total}개</Text>
-            {priorities.map((priority) => <View key={priority} style={styles.row}>
-              <PriorityBadge priority={priority} /><Text style={styles.value}>{stats.priorityCounts[priority]}개</Text>
-            </View>)}
-          </View>
           </>}
+          <View style={styles.card}>
+            <Text style={styles.heading}>Todo</Text>
+            <Text style={styles.note}>반복하지 않는 할 일 기준이에요.</Text>
+            {stats.todos.totalCompleted === 0 && stats.todos.pending === 0 ?
+              <Text style={styles.note}>아직 Todo가 없어요. 홈에서 할 일을 추가해 보세요.</Text> : <>
+              <View style={styles.row}><Text style={styles.value}>오늘 완료</Text><Text style={styles.green}>{stats.todos.todayCompleted}개</Text></View>
+              <View style={styles.row}><Text style={styles.value}>이번 주 완료</Text><Text style={styles.green}>{stats.todos.weekCompleted}개</Text></View>
+              <View style={styles.row}><Text style={styles.value}>누적 완료</Text><Text style={styles.value}>{stats.todos.totalCompleted}개</Text></View>
+              <View style={styles.row}><Text style={styles.value}>남은 할 일</Text><Text style={styles.value}>{stats.todos.pending}개</Text></View>
+              <View style={styles.row}><Text style={styles.value}>기한 지난 할 일</Text><Text style={styles.value}>{stats.todos.overdue}개</Text></View>
+              <Text style={styles.note}>기한 지난 할 일은 남은 할 일에 포함돼요.</Text>
+            </>}
+          </View>
           <View style={styles.card}>
             <Text style={styles.heading}>이번 주 루틴</Text>
             {!data.todos.some((todo) => todo.recurrence) && stats.routines.completed === 0 ?

@@ -2,6 +2,7 @@ import { DefaultTheme, ThemeProvider } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import { StyleSheet, View } from 'react-native';
+import { useEffect, useState } from 'react';
 
 import AppTabs from '@/components/app-tabs';
 import { Colors } from '@/constants/theme';
@@ -19,8 +20,15 @@ function revealApp() {
 
 function AppContent() {
   const { hydrationState, storageError, retryStorage } = useTodoContext();
+  const [minimumElapsed, setMinimumElapsed] = useState(false);
+  useEffect(() => {
+    // 앱 첫 진입에만 1초를 보장합니다. 복원과 동시에 기다려 느린 읽기에 1초를 더하지 않습니다.
+    // 탭 이동·백그라운드 복귀에서는 루트가 유지되어 타이머가 다시 시작되지 않습니다.
+    const timer = setTimeout(() => setMinimumElapsed(true), 1000);
+    return () => clearTimeout(timer);
+  }, []);
   // 홈과 탭은 모든 데이터가 복원된 뒤에만 생성합니다. 아직 빈 원본 상태를 화면에 노출하지 않습니다.
-  if (hydrationState !== 'ready') {
+  if (hydrationState !== 'ready' || !minimumElapsed) {
     return <AppStartup error={hydrationState === 'error' ? storageError ?? '데이터를 불러오지 못했어요.' : null} onRetry={retryStorage} />;
   }
   return <AppTabs />;
