@@ -1,0 +1,5 @@
+# Codex CLI 0.153.x: Manager는 기본 세션이며 자식 수만 제한합니다.
+# 모델·추론 수준·사용자 권한은 기존 환경 설정을 상속합니다.
+[agents]
+enabled = true
+max_concurrent_threads_per_session = 3

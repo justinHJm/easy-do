@@ -3,38 +3,67 @@ import { KeyboardAvoidingView, Platform, Pressable, SectionList, StyleSheet, Tex
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useEffect, useRef } from 'react';
 import { CharacterGreeting } from '@/components/character-greeting';
-import { CHARACTER_REACTION_MS, type CharacterMood } from '@/constants/character';
+import { CHARACTER_REACTION_MS, characterMessages, randomReaction } from '@/constants/character';
 
 import { TodoInput } from '@/components/todo-input';
 import { TodoItem } from '@/components/todo-item';
 import { Colors } from '@/constants/theme';
 import { useTodoContext } from '@/contexts/todo-context';
+import { TodoEditor } from '@/components/todo-editor';
+import type { TodoView } from '@/types/todo';
+import { AppState } from 'react-native';
+import { ListManager, TodoViews, viewLabels } from '@/components/todo-views';
+import { localDate } from '@/utils/due-date';
 
 const colors = Colors.light;
 
 export default function HomeScreen() {
-  const { addTodo, toggleTodo, incompleteTodos, completedTodos, totalCount, completedCount, completionRate } = useTodoContext();
+  const { todos, lists, today, loaded, storageError, retryStorage, getView, addTodo, toggleTodo, editTodo, deleteTodo,
+    addList, renameList, deleteList, profile, settings } = useTodoContext();
+  const welcomeEnabled = settings.welcomeMessages !== false;
+  const reactionsEnabled = settings.characterReactions !== false;
+  const displayName = typeof profile.displayName === 'string' ? profile.displayName : undefined;
+  const [view, setView] = useState<TodoView>('all');
+  const [managingLists, setManagingLists] = useState(false);
+  const [editingId, setEditingId] = useState<number>();
+  // 화면용 반복 회차에는 계산된 날짜가 붙습니다. 편집은 ID로 찾은 원본을 사용해 반복 시작일을 지킵니다.
+  const editingTodo = todos.find((todo) => todo.id === editingId);
+  const selectedList = lists.find((list) => view === `list:${list.id}`);
+  const activeView = view.startsWith('list:') && !selectedList ? 'all' : view;
+  const heading = selectedList?.name ?? viewLabels[activeView as keyof typeof viewLabels];
+  const { incompleteTodos, completedTodos, totalCount, completedCount, completionRate } = getView(activeView);
+  useEffect(() => {
+    if (activeView !== view) setView(activeView);
+  }, [activeView, view]);
   // 접기 여부는 화면만의 useState로 관리합니다. 목록을 접어도 Context의 완료 데이터는 삭제되지 않습니다.
   const [showCompleted, setShowCompleted] = useState(true);
-  const [characterMood, setCharacterMood] = useState<CharacterMood>('welcome');
+  const [reaction, setReaction] = useState<ReturnType<typeof randomReaction> | null>(() => welcomeEnabled ? randomReaction('welcome', displayName) : null);
   const reactionTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // 화면이 사라지면 예약된 반응도 취소해, 더 이상 표시되지 않는 화면의 상태를 바꾸지 않습니다.
-  useEffect(() => () => {
+  useEffect(() => {
+    // 다른 탭에서 설정을 바꾸면 예약된 칭찬도 취소합니다. OFF인 환영 문구가 다시 나타나지 않게 합니다.
     if (reactionTimer.current !== null) clearTimeout(reactionTimer.current);
-  }, []);
+    setReaction(welcomeEnabled ? randomReaction('welcome', displayName) : null);
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state !== 'active') return;
+      if (reactionTimer.current !== null) clearTimeout(reactionTimer.current);
+      setReaction(welcomeEnabled ? randomReaction('welcome', displayName) : null);
+    });
+    return () => { subscription.remove(); if (reactionTimer.current !== null) clearTimeout(reactionTimer.current); };
+  }, [welcomeEnabled, reactionsEnabled, displayName, profile.localProfileId]);
 
-  function handleToggleTodo(id: number) {
+  function handleToggleTodo(id: number, occurrenceDate?: string) {
     // 사용자의 완료 동작만 확인하므로 저장 데이터를 불러오거나 완료를 취소할 때는 칭찬하지 않습니다.
     const isCompleting = incompleteTodos.some((todo) => todo.id === id);
-    toggleTodo(id);
-    if (!isCompleting) return;
+    toggleTodo(id, occurrenceDate);
+    if (!isCompleting || !reactionsEnabled) return;
 
     // 연속으로 완료하면 이전 타이머를 취소하고 마지막 완료부터 1.5초 동안 반응을 유지합니다.
     if (reactionTimer.current !== null) clearTimeout(reactionTimer.current);
-    setCharacterMood('completed');
+    setReaction(randomReaction('completed'));
     reactionTimer.current = setTimeout(() => {
-      setCharacterMood('idle');
+      setReaction(welcomeEnabled ? { mood: 'idle', message: characterMessages.idle } : null);
       reactionTimer.current = null;
     }, CHARACTER_REACTION_MS);
   }
@@ -58,22 +87,27 @@ export default function HomeScreen() {
             <Text style={styles.brand}>easy-do</Text>
           </View>
           <View style={styles.headingRow}>
-            <Text style={styles.title}>오늘 할 일</Text>
+            <Text style={styles.title}>{heading}</Text>
             <Text style={styles.summary} accessibilityLiveRegion="polite">{completedCount}/{totalCount} 완료 · {percent}%</Text>
           </View>
-          <View style={styles.track} accessibilityRole="progressbar" accessibilityLabel="오늘 할 일 완료율"
+          <View style={styles.track} accessibilityRole="progressbar" accessibilityLabel={`${heading} 완료율`}
             accessibilityValue={{ min: 0, max: 100, now: percent }}>
             <View style={[styles.progress, { width: `${completionRate}%` }]} />
           </View>
         </View>
-        <CharacterGreeting mood={characterMood} />
-        <TodoInput onAdd={addTodo} />
+        {reaction && <CharacterGreeting {...reaction} />}
+        {storageError && <Pressable accessibilityRole="button" onPress={retryStorage} style={styles.storageNotice}>
+          <Text style={styles.error}>{storageError} · 다시 시도</Text>
+        </Pressable>}
+        <TodoInput onAdd={addTodo} lists={lists} defaultListId={selectedList?.id} disabled={!loaded} />
+        <TodoViews view={activeView} lists={lists} onChange={setView} onManage={() => { if (loaded) setManagingLists(true); }} />
         <SectionList
           style={styles.list}
           contentContainerStyle={styles.listContent}
           sections={sections}
           keyExtractor={(item) => String(item.id)}
-          renderItem={({ item }) => <TodoItem todo={item} onToggle={handleToggleTodo} />}
+          extraData={today}
+          renderItem={({ item }) => <TodoItem todo={item} onToggle={handleToggleTodo} onEdit={(todo) => setEditingId(todo.id)} today={localDate(today)} />}
           stickySectionHeadersEnabled={false}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
@@ -87,7 +121,7 @@ export default function HomeScreen() {
           ) : <Text style={styles.pendingTitle}>할 일 {incompleteTodos.length}개</Text>}
           renderSectionFooter={({ section }) => {
             if (section.key === 'incomplete' && incompleteTodos.length === 0) {
-              return <Text style={styles.empty}>{totalCount === 0 ? '첫 할 일을 추가해 보세요.' : '오늘 할 일을 모두 마쳤어요!'}</Text>;
+              return <Text style={styles.empty}>{!loaded ? '저장 데이터를 기다리고 있어요.' : totalCount === 0 ? '이 보기에 해당하는 할 일이 없어요.' : '이 보기의 할 일을 모두 마쳤어요!'}</Text>;
             }
             if (section.key === 'completed' && showCompleted && completedCount === 0) {
               return <Text style={styles.empty}>완료한 일이 여기에 표시돼요.</Text>;
@@ -95,6 +129,9 @@ export default function HomeScreen() {
             return null;
           }}
         />
+        {editingTodo && <TodoEditor key={editingTodo.id} todo={editingTodo} lists={lists}
+          onSave={editTodo} onDelete={deleteTodo} onClose={() => setEditingId(undefined)} />}
+        {managingLists && <ListManager lists={lists} onAdd={addList} onRename={renameList} onDelete={deleteList} onClose={() => setManagingLists(false)} />}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -102,6 +139,7 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
+  storageNotice: { paddingHorizontal: 16, paddingVertical: 6 }, error: { fontSize: 12, color: '#B52F3B' },
   header: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 12, gap: 6 },
   logo: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   brand: { fontSize: 24, fontWeight: '800', letterSpacing: -0.7, color: colors.primary },

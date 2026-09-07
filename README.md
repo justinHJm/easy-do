@@ -1,56 +1,158 @@
-# Welcome to your Expo app 👋
+# easy-do v0.1.0
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+React Native · Expo SDK 57 · TypeScript로 만든 Android Todo 앱입니다.
+공식 기준 문서: https://docs.expo.dev/versions/v57.0.0/
 
-## Get started
+## 실행과 검사
 
-1. Install dependencies
-
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
+```sh
+npm ci
+npx expo start
+npx tsc --noEmit
+node scripts/test-todo-storage.cjs
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Expo Go에서 QR 코드를 열어 실행합니다. 기존 데이터가 있는 앱을 삭제하거나 저장 데이터를 초기화하지 않고 업데이트를 확인하세요.
+`npm run lint`는 있지만 ESLint 패키지·설정이 없습니다. Expo CLI가 자동 설치를 시도하므로 이번 버전에는 lint 설정을 추가하지 않았습니다.
 
-### Other setup steps
+## 사용법
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+- 입력창과 추가 버튼으로 Todo를 만듭니다. 기본 우선순위는 보통입니다.
+- 리스트가 있으면 입력창 아래 작은 선택 영역에서 소속을 고릅니다. 리스트 보기에서는 해당 리스트가 기본 소속입니다.
+- 제목을 누르면 수정 창이 열립니다. 제목·우선순위·기한·리스트·반복을 설정하고 저장합니다.
+- 기한은 월별 달력에서 고릅니다. 확인 전 취소할 수 있고 기한 없음도 가능합니다.
+- 삭제는 수정 창에서 한 번 더 확인합니다. 루틴을 삭제해도 과거 회차 기록은 남습니다.
+- 오른쪽 체크박스로 완료·취소합니다. 회색·취소선 완료 영역은 접고 펼칠 수 있습니다.
+- 보기 줄을 가로로 밀면 사용자 리스트와 `＋`가 나옵니다. `＋`의 관리 창에서 리스트 생성·이름 변경·삭제를 합니다.
+- 진행률은 선택한 보기에 표시되는 일반 Todo와 루틴 회차를 기준으로 계산합니다. 기한 임박은 미완료 전용이라 완료율이 0%입니다.
 
-## Learn more
+## 주요 구조
 
-To learn more about developing your project with Expo, look at the following resources:
+| 파일 | 역할 |
+| --- | --- |
+| `src/types/todo.ts` | Todo, 리스트, History, 반복 규칙·완료 기록 타입 |
+| `src/utils/todo-state.ts` | 상태 변경, 공통 정렬, 필터, 반복 계산, History 이동 |
+| `src/utils/due-date.ts` | 날짜 전용 값, 달력, 날짜 차이·주 경계 |
+| `src/storage/todo-storage.ts` | 저장 형식 검사, 이전 데이터 변환, 순차 저장 |
+| `src/hooks/use-todos.ts` | 상태와 비동기 저장 연결, 초기 복원, 날짜 이벤트 |
+| `src/contexts/todo-context.tsx` | 탭이 공유하는 상태 공급 (기존 구조 유지) |
+| `src/app/index.tsx` | 보기·완료 영역·편집 창·캐릭터 연결 |
+| `src/components/todo-input.tsx`, `todo-item.tsx`, `todo-editor.tsx` | 입력·목록 행·수정 화면 |
+| `src/components/todo-calendar.tsx` | 기존 달력 재사용 |
+| `src/components/todo-views.tsx` | 스마트 보기·리스트 관리·공통 리스트 선택 |
+| `src/components/recurrence-picker.tsx` | 매일·요일·매월 날짜 선택 |
+| `src/constants/character.ts`, `src/components/character-greeting.tsx` | 이미지·말풍선·대사 관리 및 표시 |
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+모든 보기는 **필터 → 높음·보통·낮음 → 같은 우선순위의 생성 번호 순**입니다.
+기존 ID가 생성 순서대로 증가하므로 보존합니다. 기한은 정렬에 관여하지 않습니다. 완료 구역에도 같은 규칙을 적용합니다.
 
-## Join the community
+## 날짜와 스마트 보기
 
-Join our community of developers creating universal apps.
+기한·반복 시작일·회차일은 `YYYY-MM-DD` 형식으로 저장하고 현지 달력 날짜로 해석합니다.
+`createdAt`, `completedAt`은 실제 시각을 담는 ISO 문자열입니다. 완료 당일 여부는 기기의 현지 날짜로 판단합니다.
+날짜 차이는 연·월·일만 UTC 숫자로 비교해 서머타임의 23/25시간 하루에도 정확히 계산합니다.
+달력은 1일의 요일만큼 빈 칸을 넣고 다음 달 0일로 말일을 구해 윤년도 처리합니다.
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+| 보기 | 조건 |
+| --- | --- |
+| 전체 | 현재 Todo와 각 루틴의 오늘 또는 다음 예정 회차 |
+| 오늘 | 오늘이 기한인 일반 Todo와 오늘 발생하는 루틴 |
+| 이번 주 | 오늘부터 이번 일요일까지 (월요일~일요일 기준) |
+| 기한 임박 | 기한이 지났거나 오늘부터 3일 이내인 미완료 항목 |
+| 루틴 | 반복 규칙이 있는 Todo |
+| 사용자 리스트 | 해당 `listId`의 Todo |
+
+스마트 보기는 소속을 바꾸지 않습니다. 리스트는 `{ id, name }`, Todo의 소속은 선택적인 `listId`입니다.
+리스트를 삭제하면 활성 Todo의 소속만 해제합니다. 과거 History의 당시 소속 ID는 보존합니다.
+
+## 반복과 History
+
+반복은 기존 Todo의 선택 속성 `recurrence`입니다.
+
+```ts
+{ type: 'daily', startDate: '2026-09-07' }
+{ type: 'weekly', startDate: '2026-09-07', weekdays: [1, 3, 5] }
+{ type: 'monthly', startDate: '2026-09-07', day: 31 }
+```
+
+요일은 일요일 0~토요일 6입니다. 없는 월별 날짜는 그달 말일에 실행하고 다음 달에는 원래 지정한 날짜를 다시 사용합니다.
+시작일을 지정하지 않으면 오늘부터입니다. 놓친 회차를 여러 Todo로 쌓지 않고 오늘 또는 다음 예정 회차 하나를 계산합니다.
+미래 회차도 미리 완료할 수 있으며, 예정 날짜가 지나면 다음 회차로 넘어갑니다.
+
+회차 완료는 `{ todoId, occurrenceDate, completedAt, snapshot }`으로 별도 저장합니다.
+원본을 영구 완료하지 않으며 같은 Todo·날짜 기록은 하나뿐입니다. 다시 체크하면 해당 회차 완료만 취소합니다.
+`snapshot`은 당시 Todo 사본으로 원본 수정·삭제 후에도 과거 제목·우선순위·소속을 보존합니다.
+일반 Todo와 루틴 사이를 전환할 때는 현재 회차의 완료 상태를 유지하고 기록의 보관 위치를 옮겨 중복을 피합니다.
+
+일반 Todo는 완료 당일 완료 목록에 남고 다음 날 History로 이동합니다.
+History에는 ID·제목·우선순위·기한·리스트·완료 시각 등 당시 필드를 보존하며 홈에는 표시하지 않습니다.
+완료한 일반 Todo를 당일 직접 삭제해도 기록은 남습니다.
+앱 시작, 30초마다 날짜 확인, 앱이 화면 앞으로 돌아올 때 날짜를 갱신하며 자정 직후 사용자 입력에서도 날짜를 확인합니다.
+백그라운드 서비스는 사용하지 않습니다.
+
+## 저장과 호환
+
+기존 AsyncStorage(기기에 문자열을 저장하는 저장소)를 사용합니다.
+새 키 `@easy-do/data/v2`에 `schemaVersion`, `todos`, `lists`, `history`, `completions`, `profile`, `settings`, `nextId`, `nextListId`를 하나의 JSON 문자열로 저장합니다.
+Todo 변경·리스트 변경·History 이동 후 자동 저장하며 요청 순서를 지킵니다. Todo 제거와 History 추가가 함께 저장됩니다.
+
+새 키가 없을 때만 기존 `@easy-do/todos/v1` 배열을 읽습니다. 이를 migration(기존 데이터를 새 구조로 옮기는 작업)이라고 합니다.
+기존 ID·내용·우선순위·완료 여부·기한을 유지하고 없는 선택 필드는 요구하지 않습니다.
+예전 완료 시각을 모르면 이전 시각을 부여해 첫날 완료 취소 기회를 남깁니다. 이전 키는 지우거나 덮어쓰지 않습니다.
+
+복원 성공 전에는 빈 목록을 저장하지 않습니다. 읽기 실패·손상은 원본을 보존하고 다시 시도 버튼으로 알립니다.
+쓰기 실패는 화면 상태를 유지하고 재시도를 제공합니다. 읽는 중에는 Todo 입력을 잠시 막습니다.
+단일 기기 저장이며 강제 종료 직전 아직 완료되지 않은 쓰기까지 보장하지는 않습니다.
+
+## 앱 초기 로딩
+
+hydration(저장 데이터를 앱 메모리로 복원하는 과정) 상태를 `loading / ready / error`로 구분합니다.
+Todo·History·반복 완료 기록·사용자 리스트·로컬 프로필·사용자 설정을 함께 복원한 뒤 홈과 탭을 표시합니다.
+프로필이 없으면 기본 닉네임 ‘사용자’와 기기 내부 식별자·생성 시각을 자동으로 보완합니다. 이전 데이터에 프로필·설정 필드가 없어도 읽을 수 있으며 기존 추가 필드는 보존합니다.
+
+복원 중에는 흰색 배경의 easy-do 로고, 기존 base 캐릭터, 작은 초록색 로딩 표시와 “오늘도 가볍게 시작해요” 문구를 표시합니다.
+성공하면 추가 대기 없이 홈으로 전환합니다. 읽기 실패나 15초 동안 응답이 없는 경우 재시도 화면으로 전환하며 원본을 덮어쓰지 않습니다.
+15초는 로딩 화면을 보여주기 위한 지연이 아니라 무한 대기를 막는 제한입니다. 재시도 이전의 늦은 응답은 무시합니다.
+
+네이티브 시작 화면은 첫 React 화면이 배치될 때 숨겨 재시도 UI를 가리지 않습니다.
+Expo Go에서는 앱 내부 로딩 화면을 확인할 수 있지만 네이티브 시작 화면의 최종 모습은 별도 릴리스 빌드에서 확인해야 합니다.
+공식 설명: https://docs.expo.dev/versions/v57.0.0/sdk/splash-screen/
+
+직접 확인할 때는 저장된 Todo가 있는 상태에서 앱을 완전히 종료하고 다시 열어 빈 홈이 먼저 보이지 않는지 확인합니다.
+자동 검사는 지연된 읽기·읽기 실패·시간 초과·재시도·이전 응답 무시·복원 전 저장 방지·홈 생성 차단을 포함합니다.
+
+## 캐릭터
+
+접속 때 wave/base와 환영 문구를 각각 랜덤 선택합니다. 완료 때 happy/cheer/clap과 칭찬 문구를 선택합니다.
+마지막 완료로부터 1.5초 뒤 base로 돌아갑니다. 완료 취소·데이터 복원에는 칭찬하지 않습니다.
+캐릭터 이미지·말풍선 이미지·React Native Text 문구는 분리되어 있습니다.
+
+## Expo Go 직접 확인 목록
+
+1. 기존 앱의 제목·기한·우선순위·완료 여부가 업데이트 후 유지되는지 확인합니다.
+2. 공백 거부, 입력·추가·키보드 제출, 추가 후 기본 보통 복귀를 확인합니다.
+3. 우선순위를 섞어 추가하고 모든 보기에서 우선순위·생성 순서를 확인합니다.
+4. 제목 탭 → 수정 → 저장, 닫기 취소, 달력 월 이동·날짜 선택·취소·기한 없음을 확인합니다.
+5. 오른쪽 체크·완료 취소, 회색 취소선, 접기·펼치기, 보기별 진행률을 확인합니다.
+6. `＋`에서 리스트 추가·이름 변경·삭제를 하고 삭제한 리스트의 Todo가 전체에 남는지 확인합니다.
+7. 생성·수정 시 리스트 선택, 탭 이동 후 데이터 유지를 확인합니다.
+8. 오늘·3일 후·4일 후·일요일·다음 월요일·기한 지난 Todo로 스마트 보기 경계를 확인합니다.
+9. 매일·매주 여러 요일·매월 31일 루틴을 만들고 회차 완료·취소를 확인합니다.
+10. 앱 완전 종료 후 다시 열어 Todo·리스트·반복·회차 완료가 유지되는지 확인합니다.
+11. 다음 날 재실행하거나 자정을 넘긴 후 앱으로 돌아와 일반 완료 정리와 루틴 새 회차를 확인합니다. 과거 기록 보존은 자동 검사로 확인합니다.
+12. 접속·연속 완료·완료 취소의 캐릭터 대사와 1.5초 복귀를 확인합니다.
+13. 작은 화면·키보드·긴 제목·많은 리스트·다크 모드에서 흰색 화면, 스크롤, 오른쪽 체크박스, 하단 탭을 확인합니다.
+
+자동 검사 명령은 이전 데이터 호환, 실패 복구, 저장 순서, Hook 연결, 정렬, 필터, 반복, History, 월말·윤년을 검사합니다.
+통계는 History·아직 홈에 남은 일반 완료·루틴 완료 기록을 같은 원본에서 합쳐 계산합니다. 일반 완료는 ID와 완료 시각, 루틴은 ID와 회차일로 중복을 제거합니다.
+오늘·이번 주·최근 7일은 실제 완료 시각의 현지 날짜 기준이며, 이번 주는 월요일~일요일입니다. 우선순위 통계는 전체 완료 기록 기준입니다.
+루틴 달성률은 이번 주 회차 기준입니다. 현재 반복 규칙의 예정 회차와 이미 완료한 회차를 합쳐 분모로 사용하므로, 과거 규칙 변경 이력이 없는 현재 구조에서는 예정 횟수가 추정치입니다.
+
+마이에서는 닉네임·내장 캐릭터 아이콘 편집, 홈과 같은 리스트 관리, 최근순 완료 기록, 캐릭터 반응·환영 메시지 설정, 전체 데이터 삭제와 실제 앱 버전을 확인할 수 있습니다.
+프로필과 설정도 같은 AsyncStorage JSON에 자동 저장합니다. 환영 문구 일부에 닉네임을 사용하며 각 설정을 끄면 해당 반응을 생략합니다.
+전체 삭제는 두 단계 확인 뒤 앱 전용 이전 Todo 키를 제거하고 초기 데이터를 저장합니다. 다른 앱의 저장 키는 건드리지 않습니다. 성공 후 기본 프로필과 설정으로 돌아갑니다.
+
+추가 기기 확인: 완료·취소 직후 통계 변화, 기록 없는 통계 화면, 최근순 완료 기록, 닉네임·아이콘·설정 재실행 유지, 홈/마이 리스트 공유를 확인하세요.
+전체 삭제 확인은 보존할 데이터가 없는 테스트 환경에서 진행하세요. 첫 확인·최종 확인 취소 시 그대로 유지되는지, 최종 삭제 후 재실행에도 초기 상태인지 확인합니다.
+사용자의 이번 완성 요청에 따라 표시 버전을 0.1.1에서 0.1.0으로 맞췄습니다. 배포나 Git tag를 생성한 것은 아닙니다.
+위젯·알림·로그인·서버·클라우드/웹 동기화·AI·외부 캘린더 연동은 이번 버전에 포함하지 않습니다.

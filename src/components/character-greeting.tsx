@@ -1,13 +1,13 @@
 import { Image, ImageBackground, StyleSheet, Text, View } from 'react-native';
-import { bubbleImages, characterImages, characterMessages, type CharacterMood } from '@/constants/character';
+import { bubbleImages, characterImages, type CharacterMood } from '@/constants/character';
 import { Colors } from '@/constants/theme';
 
-export function CharacterGreeting({ mood }: { mood: CharacterMood }) {
+export function CharacterGreeting({ mood, message }: { mood: CharacterMood; message: string }) {
   return (
     <View style={styles.row}>
       <Image source={characterImages[mood]} style={styles.character} resizeMode="contain" accessible={false} />
       <ImageBackground source={bubbleImages.basic} style={styles.bubble} resizeMode="stretch">
-        <Text style={styles.message} accessibilityLiveRegion="polite">{characterMessages[mood]}</Text>
+        <Text style={styles.message} accessibilityLiveRegion="polite">{message}</Text>
       </ImageBackground>
     </View>
   );
