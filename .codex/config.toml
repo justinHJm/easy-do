@@ -1,5 +1,7 @@
-# Codex CLI 0.153.x: Manager는 기본 세션이며 자식 수만 제한합니다.
-# 모델·추론 수준·사용자 권한은 기존 환경 설정을 상속합니다.
+# Codex CLI 0.153.x: Manager 모델·reasoning과 사용자 권한은 유지합니다.
+# 자식만 역할별 모델과 동시 상한을 적용합니다.
 [agents]
 enabled = true
-max_concurrent_threads_per_session = 3
+max_concurrent_threads_per_session = 2
+default_subagent_model = "gpt-5.6-terra"
+default_subagent_reasoning_effort = "medium"
