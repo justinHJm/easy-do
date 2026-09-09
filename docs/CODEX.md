@@ -66,8 +66,9 @@ Android versionCode는 앱 버전과 별도다. APK 작업 때 실제 EAS local/
 
 ## APK 준비 상태
 
-현재 eas.json, android.package, EAS projectId, android 폴더가 없다. npm run android는 개발 서버이며 APK 빌드가 아니다.
-실제 빌드는 build-apk에서 계정·식별자·서명·업로드 범위를 확인한다. 이번 설정 변경으로 빌드나 서버 종료를 하지 않는다.
+`eas.json`의 preview 프로필은 직접 설치할 Android APK를 만든다. `npx.cmd --yes eas-cli@23.2.0 build --platform android --profile preview`로 실행한다.
+앱 식별자는 `com.justinhjm.easydo`, EAS 프로젝트는 `@ceba77/easy-do`다. 앱 표시 버전은 0.1.1이고 별도 빌드 번호는 EAS remote에서 관리한다. 서명 키를 Git에 넣지 않는다.
+빌드 시 소스가 EAS로 업로드된다. 로컬 android 폴더는 생성하지 않는다. npm run android는 개발 서버 실행이며 APK 빌드가 아니다.
 
 ## 검증 근거와 한계
 
