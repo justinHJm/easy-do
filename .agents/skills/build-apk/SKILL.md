@@ -8,6 +8,12 @@ description: easy-do를 Android 폰에 직접 설치할 APK로 준비하거나 �
 AGENTS.md와 SDK57 문서를 먼저 읽고 실제 app.json, eas.json, android 폴더, EAS CLI 설치·로그인 상태를 확인한다.
 현재 기준은 `docs/CODEX.md`의 빌드 준비 상태다. 실행 시 최신 파일을 다시 확인한다.
 
+## APK 이름과 아이콘
+
+- 전달할 APK 파일명은 `easy-do v<현재 버전>.apk`로 한다. 버전은 해당 빌드의 앱 버전에서 읽는다. 예: `easy-do v0.1.1.apk`. EAS 다운로드 URL의 자동 파일명과 구분하고, 로컬에 다운로드할 때 이 이름으로 저장한다.
+- 앱 아이콘은 `assets/characters/easydo-base.png`의 기존 캐릭터를 사용한다. 현재 원본은 Android adaptive icon(기기 모양에 맞춰 잘리는 아이콘)의 안전 영역보다 넓으므로 `expo.icon`만 지정하는 기본 아이콘 방식을 사용한다. Expo 예제의 adaptiveIcon 설정은 제거하여 예제 그림이 남거나 캐릭터가 잘리지 않게 한다. 나중에 adaptive icon을 적용할 때는 충분한 여백이 있는 별도 아이콘 에셋을 먼저 준비한다.
+- 아이콘용 가공이 필요하면 원본 캐릭터 에셋을 보존한다. 아이콘 변경은 새 APK를 빌드해야 반영되며 이미 배포한 APK에는 소급 적용되지 않는다.
+
 공식 절차: https://docs.expo.dev/build-reference/apk/ , https://docs.expo.dev/build/setup/ , https://docs.expo.dev/build-reference/local-builds/ .
 EAS CLI(Expo 클라우드 빌드 도구)는 SDK와 버전이 별개이므로 설치되어 있으면 버전을 확인한다. 없으면 필요성을 설명한 뒤 사용할 명시 버전을 확인하며 앱 dependency에 넣지 않는다.
 

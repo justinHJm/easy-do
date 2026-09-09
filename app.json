@@ -4,7 +4,7 @@
     "slug": "easy-do",
     "version": "0.1.1",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/characters/easydo-base.png",
     "scheme": "easydo",
     "userInterfaceStyle": "light",
     "ios": {
@@ -12,12 +12,6 @@
     },
     "android": {
       "package": "com.justinhjm.easydo",
-      "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
-      },
       "predictiveBackGestureEnabled": false
     },
     "web": {
