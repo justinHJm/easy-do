@@ -1,8 +1,10 @@
 import type { Recurrence, Todo, TodoData, TodoEdits, TodoView, VisibleTodo } from '@/types/todo';
 import { addDays, dateKey, endOfWeek, isDueDate, localDate } from '@/utils/due-date';
 
+export const prioritySymbols: Record<Todo['priority'], string> = { veryHigh: '!!!', high: '!!', medium: '!', none: '' };
+
 export function emptyData(): TodoData {
-  return { schemaVersion: 2, todos: [], lists: [], history: [], completions: [], profile: {}, settings: {}, nextId: 1, nextListId: 1 };
+  return { schemaVersion: 3, todos: [], lists: [], history: [], completions: [], profile: {}, settings: {}, nextId: 1, nextListId: 1 };
 }
 
 // 이전 버전에 비어 있던 프로필만 보완합니다. 저장된 식별자와 모르는 추가 필드는 그대로 둡니다.
@@ -19,7 +21,7 @@ export function initializeLocalData(data: TodoData, now: string): TodoData {
   } };
 }
 
-const ranks = { high: 0, normal: 1, low: 2 };
+const ranks: Record<Todo['priority'], number> = { veryHigh: 0, high: 1, medium: 2, none: 3 };
 // 모든 보기가 이 함수만 사용합니다. 날짜는 정렬에 관여하지 않으며, 같은 우선순위는 생성 번호 순입니다.
 export function sortTodos<T extends Todo>(todos: readonly T[]): T[] {
   return [...todos].sort((a, b) => ranks[a.priority] - ranks[b.priority] || a.id - b.id);
@@ -136,7 +138,7 @@ export function updateData(original: TodoData, action: DataAction, now: string):
     case 'day': return data;
     case 'add': {
       if (!action.title.trim()) return data;
-      const todo: Todo = { id: data.nextId, title: action.title.trim(), priority: action.priority ?? 'normal',
+      const todo: Todo = { id: data.nextId, title: action.title.trim(), priority: action.priority ?? 'none',
         completed: false, createdAt: now, listId: validList(action.listId) };
       return { ...data, nextId: data.nextId + 1, todos: [...data.todos, todo] };
     }

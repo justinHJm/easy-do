@@ -8,11 +8,12 @@ import { characterImages } from '@/constants/character';
 import { ListManager } from '@/components/todo-views';
 import { useTodoContext } from '@/contexts/todo-context';
 import { getCompletionRecords } from '@/utils/todo-statistics';
+import { prioritySymbols } from '@/utils/todo-state';
 
 const avatars = ['idle', 'welcome', 'completed', 'cheer'] as const;
 type Avatar = typeof avatars[number];
 const avatarLabels = { idle: '기본', welcome: '인사', completed: '기쁨', cheer: '응원' };
-const priorityLabels = { high: '높음', normal: '보통', low: '낮음' };
+const priorityLabels = { veryHigh: '매우 높음', high: '높음', medium: '보통', none: '없음' };
 
 export default function MyScreen() {
   const data = useTodoContext();
@@ -74,7 +75,7 @@ export default function MyScreen() {
                 <Text style={styles.text}>프로필 이미지</Text><View style={styles.choices}>{avatars.map((choice) => <Pressable key={choice} accessibilityRole="radio" accessibilityLabel={`${avatarLabels[choice]} 이미지`} accessibilityState={{ checked: draftAvatar === choice }} style={[styles.choice, draftAvatar === choice && styles.selected]} onPress={() => setDraftAvatar(choice)}><Image source={characterImages[choice]} style={styles.choiceImage} resizeMode="contain" /><Text style={styles.muted}>{avatarLabels[choice]}</Text></Pressable>)}</View>
                 <Pressable accessibilityRole="button" disabled={!draftName.trim()} style={[styles.primaryButton, !draftName.trim() && styles.disabled]} onPress={() => { updateProfile(draftName.trim(), draftAvatar); setPanel(null); }}><Text style={styles.primaryText}>저장</Text></Pressable>
               </>}
-              {panel === 'history' && <><Text style={styles.muted}>최근 완료한 순서예요.</Text>{records.length === 0 ? <Text style={styles.empty}>아직 완료 기록이 없어요.</Text> : records.map((record) => <View key={record.key} style={styles.record}><Text style={styles.text}>{record.title}</Text><Text style={styles.muted}>{record.kind === 'routine' ? '루틴' : '할 일'} · 우선순위 {priorityLabels[record.priority]}</Text><Text style={styles.muted}>{new Date(record.completedAt).toLocaleString('ko-KR')}</Text></View>)}</>}
+              {panel === 'history' && <><Text style={styles.muted}>최근 완료한 순서예요.</Text>{records.length === 0 ? <Text style={styles.empty}>아직 완료 기록이 없어요.</Text> : records.map((record) => <View key={record.key} style={styles.record}><Text style={styles.text}>{record.title}</Text><Text style={styles.muted}>{record.kind === 'routine' ? '루틴' : '할 일'} · 우선순위 {prioritySymbols[record.priority] ? `${prioritySymbols[record.priority]} ` : ''}{priorityLabels[record.priority]}</Text><Text style={styles.muted}>{new Date(record.completedAt).toLocaleString('ko-KR')}</Text></View>)}</>}
               {panel === 'reset' && <>
                 <Text style={styles.heading}>{resetStep === 1 ? '삭제할 데이터를 확인해 주세요' : '정말 모두 삭제할까요?'}</Text><Text style={styles.text}>할 일, 리스트, 완료 기록, 루틴 완료 기록, 프로필, 설정이 모두 삭제돼요.</Text><Text style={styles.danger}>삭제한 데이터는 되돌릴 수 없어요.</Text>
                 {resetError && <Text accessibilityLiveRegion="assertive" style={styles.danger}>{resetError}</Text>}

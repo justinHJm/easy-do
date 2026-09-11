@@ -12,7 +12,7 @@ export function TodoInput({ onAdd, lists, defaultListId, disabled }: {
 }) {
   // useState로 입력 중인 내용과 선택값, 팝업 표시 여부를 기억합니다. 아직 추가하지 않은 내용은 저장하지 않습니다.
   const [title, setTitle] = useState('');
-  const [priority, setPriority] = useState<TodoPriority>('normal');
+  const [priority, setPriority] = useState<TodoPriority>('none');
   const [menuOpen, setMenuOpen] = useState(false);
   const [listId, setListId] = useState(defaultListId);
   // 리스트 보기를 이동하면 새 할 일의 기본 소속도 따라갑니다. 삭제된 리스트 ID는 보내지 않습니다.
@@ -24,7 +24,7 @@ export function TodoInput({ onAdd, lists, defaultListId, disabled }: {
     if (!canAdd) return;
     onAdd(title.trim(), priority, selectedList?.id);
     setTitle('');
-    setPriority('normal');
+    setPriority('none');
   }
   return (
     <View style={styles.container}>
@@ -59,7 +59,7 @@ export function TodoInput({ onAdd, lists, defaultListId, disabled }: {
               </Pressable>
             </View>
             <View accessibilityRole="radiogroup" accessibilityLabel="우선순위 선택">
-        {(['high', 'normal', 'low'] as const).map((value) => (
+        {(['veryHigh', 'high', 'medium', 'none'] as const).map((value) => (
           <Pressable key={value} accessibilityRole="radio" accessibilityLabel={priorityLabels[value]}
             accessibilityState={{ checked: priority === value }} onPress={() => { setPriority(value); setMenuOpen(false); }}
             style={({ pressed }) => [styles.option, priority === value && styles.selected, pressed && styles.pressed]}>

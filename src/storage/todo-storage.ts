@@ -9,7 +9,21 @@ const DATA_KEY = '@easy-do/data/v2';
 // Promise(나중에 끝나는 작업의 결과)를 연결해 저장 요청을 순서대로 처리합니다.
 let pendingWrite: Promise<void> = Promise.resolve();
 
-export function parseTodos(raw: string | null): Todo[] {
+// 스키마 2와 이전 배열은 세 단계였으므로 새 네 단계로 옮깁니다.
+function normalizeLegacyPriority(value: unknown): Todo['priority'] {
+  switch (value) {
+    case 'high': return 'veryHigh';
+    case 'normal': return 'high';
+    case 'low': return 'medium';
+    default: return 'none';
+  }
+}
+
+function normalizeCurrentPriority(value: unknown): Todo['priority'] {
+  return value === 'veryHigh' || value === 'high' || value === 'medium' || value === 'none' ? value : 'none';
+}
+
+export function parseTodos(raw: string | null, legacyPriorities = true): Todo[] {
   if (raw === null) return [];
   // JSON(데이터를 문자열로 표현하는 형식)을 해석합니다. 저장 내용은 타입 선언만으로 신뢰할 수 없어 검사합니다.
   const value: unknown = JSON.parse(raw);
@@ -22,13 +36,13 @@ export function parseTodos(raw: string | null): Todo[] {
     if (typeof todo.id !== 'number' || !Number.isSafeInteger(todo.id) || todo.id <= 0 ||
         todo.id >= Number.MAX_SAFE_INTEGER || ids.has(todo.id) ||
         typeof todo.title !== 'string' || !todo.title.trim() ||
-        (todo.priority !== 'high' && todo.priority !== 'normal' && todo.priority !== 'low') ||
         typeof todo.completed !== 'boolean') throw new Error('Invalid Todo fields');
     ids.add(todo.id);
     // 손상된 반복 규칙을 버리면 일반 Todo로 바뀌므로, 이 경우에는 원본을 보존하고 복원을 중단합니다.
     if (todo.recurrence !== undefined && !validRecurrence(todo.recurrence)) throw new Error('반복 규칙 오류');
     // 선택 필드가 없던 기존 데이터도 읽습니다. 잘못된 기한만 제외하고 Todo 자체는 보존합니다.
-    return { id: todo.id, title: todo.title, priority: todo.priority as Todo['priority'], completed: todo.completed,
+    return { id: todo.id, title: todo.title,
+      priority: legacyPriorities ? normalizeLegacyPriority(todo.priority) : normalizeCurrentPriority(todo.priority), completed: todo.completed,
       ...(isDueDate(todo.dueDate) ? { dueDate: todo.dueDate } : {}),
       ...(validTime(todo.createdAt) ? { createdAt: todo.createdAt } : {}),
       ...(validTime(todo.completedAt) ? { completedAt: todo.completedAt } : {}),
@@ -62,9 +76,10 @@ function parseLocalObject(value: unknown): LocalProfile {
 
 export function parseData(raw: string): TodoData {
   const value = JSON.parse(raw);
-  if (!value || value.schemaVersion !== 2 || !Array.isArray(value.todos) || !Array.isArray(value.lists) ||
+  if (!value || (value.schemaVersion !== 2 && value.schemaVersion !== 3) || !Array.isArray(value.todos) || !Array.isArray(value.lists) ||
     !Array.isArray(value.history) || !Array.isArray(value.completions)) throw new Error('저장 데이터 형식 오류');
-  const todos = parseTodos(JSON.stringify(value.todos));
+  const legacyPriorities = value.schemaVersion === 2;
+  const todos = parseTodos(JSON.stringify(value.todos), legacyPriorities);
   const listIds = new Set<number>();
   const lists: TodoList[] = value.lists.map((list: TodoList) => {
     if (!list || !positiveId(list.id) || typeof list.name !== 'string' || !list.name.trim() || listIds.has(list.id)) throw new Error('리스트 데이터 오류');
@@ -73,7 +88,7 @@ export function parseData(raw: string): TodoData {
   });
   const history: TodoHistory[] = value.history.map((item: TodoHistory) => {
     if (!item || !validTime(item.completedAt)) throw new Error('완료 기록 오류');
-    return { ...parseTodos(JSON.stringify([item]))[0], completedAt: item.completedAt };
+    return { ...parseTodos(JSON.stringify([item]), legacyPriorities)[0], completedAt: item.completedAt };
   });
   const completionKeys = new Set<string>();
   const completions: RoutineCompletion[] = value.completions.map((c: RoutineCompletion) => {
@@ -82,22 +97,28 @@ export function parseData(raw: string): TodoData {
     if (completionKeys.has(key)) throw new Error('반복 완료 기록 중복');
     completionKeys.add(key);
     return { todoId: c.todoId, occurrenceDate: c.occurrenceDate, completedAt: c.completedAt,
-      snapshot: parseTodos(JSON.stringify([c.snapshot]))[0] };
+      snapshot: parseTodos(JSON.stringify([c.snapshot]), legacyPriorities)[0] };
   });
   // 삭제·History 이동 후에도 번호를 재사용하지 않아 과거 회차 기록이 새 Todo에 연결되지 않습니다.
   const nextId = [...todos, ...history, ...completions.map((c) => ({ id: c.todoId }))]
     .reduce((max, t) => Math.max(max, t.id + 1), positiveId(value.nextId) ? value.nextId : 1);
-  return { schemaVersion: 2, todos, lists, history, completions, nextId,
+  return { schemaVersion: 3, todos, lists, history, completions, nextId,
     profile: parseLocalObject(value.profile), settings: parseLocalObject(value.settings),
     nextListId: lists.reduce((max, l) => Math.max(max, l.id + 1), positiveId(value.nextListId) ? value.nextListId : 1) };
 }
 
-export async function loadData(now: string): Promise<TodoData> {
+export async function loadDataWithDiagnostics(now: string): Promise<{ data: TodoData; rawExists: boolean; key: string }> {
   await pendingWrite;
   const raw = await AsyncStorage.getItem(DATA_KEY);
-  if (raw !== null) return parseData(raw);
+  if (raw !== null) return { data: parseData(raw), rawExists: true, key: DATA_KEY };
   // 새 저장소가 없을 때만 이전 배열을 읽습니다. 이전 키는 지우거나 덮어쓰지 않아 원본을 보존합니다.
-  return migrateLegacy(await AsyncStorage.getItem(STORAGE_KEY), now);
+  const legacyRaw = await AsyncStorage.getItem(STORAGE_KEY);
+  if (legacyRaw !== null) return { data: migrateLegacy(legacyRaw, now), rawExists: true, key: STORAGE_KEY };
+  return { data: migrateLegacy(null, now), rawExists: false, key: DATA_KEY };
+}
+
+export async function loadData(now: string): Promise<TodoData> {
+  return (await loadDataWithDiagnostics(now)).data;
 }
 
 export function saveData(data: TodoData): Promise<void> {

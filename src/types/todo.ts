@@ -1,5 +1,5 @@
 // 유니언 타입(허용할 값을 나열한 타입)으로 정해진 세 우선순위만 사용하게 합니다.
-export type TodoPriority = 'high' | 'normal' | 'low';
+export type TodoPriority = 'veryHigh' | 'high' | 'medium' | 'none';
 
 // 반복 규칙은 Todo의 선택 속성입니다. 회차별 완료 여부는 별도 Completion에 보관합니다.
 export type Recurrence = { startDate: string } & (
@@ -40,7 +40,7 @@ export type UserProfile = LocalProfile & { localProfileId: string; displayName: 
 export type HydrationState = 'loading' | 'ready' | 'error';
 
 export type TodoData = {
-  schemaVersion: 2;
+  schemaVersion: 3;
   todos: Todo[];
   lists: TodoList[];
   history: TodoHistory[];

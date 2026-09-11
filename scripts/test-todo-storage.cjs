@@ -50,17 +50,17 @@ test('기본값·공백 검증·수정·기한 제거·완료 취소·ID 재사�
   assert.equal(reduce(data, { type: 'add', title: ' ' }), data);
   data = reduce(data, { type: 'add', title: ' 첫 일 ' });
   assert.equal(data.todos[0].title, '첫 일');
-  assert.equal(data.todos[0].priority, 'normal');
+  assert.equal(data.todos[0].priority, 'none');
   assert.equal(data.todos[0].createdAt, now);
   data = reduce(data, { type: 'toggle', id: 1 });
   assert.equal(data.todos[0].completedAt, now);
-  data = reduce(data, { type: 'edit', id: 1, changes: { title: '수정', priority: 'high', dueDate: '2028-02-29' } });
+  data = reduce(data, { type: 'edit', id: 1, changes: { title: '수정', priority: 'veryHigh', dueDate: '2028-02-29' } });
   assert.equal(data.todos[0].completed, true);
   assert.equal(data.todos[0].dueDate, '2028-02-29');
-  for (const changes of [{ title: ' ', priority: 'normal' }, { title: '유지', priority: 'normal', dueDate: '2027-02-29' }]) {
+  for (const changes of [{ title: ' ', priority: 'none' }, { title: '유지', priority: 'none', dueDate: '2027-02-29' }]) {
     assert.equal(reduce(data, { type: 'edit', id: 1, changes }), data);
   }
-  data = reduce(data, { type: 'edit', id: 1, changes: { title: '수정', priority: 'low', dueDate: undefined } });
+  data = reduce(data, { type: 'edit', id: 1, changes: { title: '수정', priority: 'medium', dueDate: undefined } });
   assert.equal(data.todos[0].dueDate, undefined);
   data = reduce(data, { type: 'toggle', id: 1 });
   assert.equal(data.todos[0].completedAt, undefined);
@@ -72,7 +72,7 @@ test('기본값·공백 검증·수정·기한 제거·완료 취소·ID 재사�
 
 test('모든 보기와 완료 구역: 우선순위 → 생성 순서, 진행률', () => {
   let data = reduce(core.emptyData(), { type: 'list-add', name: '학교' });
-  for (const priority of ['low', 'high', 'normal', 'high', 'low']) {
+  for (const priority of ['none', 'veryHigh', 'high', 'veryHigh', 'none']) {
     data = reduce(data, { type: 'add', title: priority, priority, listId: 1 });
     const todo = data.todos.at(-1);
     data = reduce(data, { type: 'edit', id: todo.id, changes: { ...todo, dueDate: '2026-09-07', recurrence: { type: 'daily', startDate: '2026-09-07' } } });
@@ -88,9 +88,26 @@ test('모든 보기와 완료 구역: 우선순위 → 생성 순서, 진행률'
   assert.equal(ids(core.visibleTodos(data, 'urgent', '2026-09-07')), '4,5');
 });
 
+test('네 단계 우선순위는 앱과 위젯에서 같은 순서와 기호를 사용한다', () => {
+  const todos = [
+    { id: 8, title: '없음', priority: 'none', completed: false }, { id: 4, title: '보통', priority: 'medium', completed: false },
+    { id: 3, title: '높음 뒤', priority: 'high', completed: false }, { id: 2, title: '매우 높음', priority: 'veryHigh', completed: false },
+    { id: 1, title: '높음 앞', priority: 'high', completed: false },
+  ];
+  assert.equal(ids(core.sortTodos(todos)), '2,1,3,4,8');
+  assert.deepEqual(plain(core.prioritySymbols), { veryHigh: '!!!', high: '!!', medium: '!', none: '' });
+  const element = (type, props) => ({ type, props });
+  const badge = load('src/components/priority-badge.tsx', {
+    'react-native': { StyleSheet: { create: (styles) => styles }, Text: 'Text' }, '@/utils/todo-state': core,
+    'react/jsx-runtime': { jsx: element },
+  });
+  assert.equal(badge.PriorityBadge({ priority: 'veryHigh' }).props.children, '!!! 매우 높음');
+  assert.equal(badge.PriorityBadge({ priority: 'none' }).props.children, '없음');
+});
+
 test('오늘·이번 주·임박 날짜 경계, 날짜보다 우선순위 우선', () => {
   const todos = ['2026-09-06', '2026-09-07', '2026-09-10', '2026-09-11', '2026-09-13', '2026-09-14', undefined]
-    .map((dueDate, i) => ({ id: i + 1, title: String(i), priority: i === 2 ? 'high' : 'normal', completed: false, dueDate }));
+    .map((dueDate, i) => ({ id: i + 1, title: String(i), priority: i === 2 ? 'veryHigh' : 'high', completed: false, dueDate }));
   const data = { ...core.emptyData(), todos };
   assert.equal(ids(core.visibleTodos(data, 'today', '2026-09-07')), '2');
   assert.equal(ids(core.visibleTodos(data, 'week', '2026-09-07')), '3,2,4,5');
@@ -113,7 +130,7 @@ test('리스트 생성·이름 변경·중복 거부·삭제 시 할 일 보존'
 });
 
 test('일반 완료 당일 표시·다음 날 History·재정리 중복 방지', () => {
-  let data = reduce(core.emptyData(), { type: 'add', title: '완료할 일', priority: 'high' });
+  let data = reduce(core.emptyData(), { type: 'add', title: '완료할 일', priority: 'veryHigh' });
   data = reduce(data, { type: 'toggle', id: 1 });
   assert.equal(core.rollover(data, '2026-09-07'), data);
   data = reduce(data, { type: 'day' }, tomorrow);
@@ -128,7 +145,7 @@ test('일반 완료 당일 표시·다음 날 History·재정리 중복 방지',
 
 test('매일 회차 완료·취소·새 회차·삭제 후 기록 보존', () => {
   let data = reduce(core.emptyData(), { type: 'add', title: '물 마시기' });
-  data = reduce(data, { type: 'edit', id: 1, changes: { title: '물 마시기', priority: 'normal', recurrence: { type: 'daily', startDate: '2026-09-07' } } });
+  data = reduce(data, { type: 'edit', id: 1, changes: { title: '물 마시기', priority: 'none', recurrence: { type: 'daily', startDate: '2026-09-07' } } });
   data = reduce(data, { type: 'toggle', id: 1, occurrenceDate: '2026-09-07' });
   assert.equal(data.todos[0].completed, false); assert.equal(data.completions.length, 1);
   assert.equal(core.visibleTodos(data, 'today', '2026-09-07')[0].completed, true);
@@ -147,7 +164,7 @@ test('매일 회차 완료·취소·새 회차·삭제 후 기록 보존', () =>
 test('일반↔반복 전환 시 완료 유지와 기록 중복 방지', () => {
   let data = reduce(core.emptyData(), { type: 'add', title: '전환' });
   data = reduce(data, { type: 'toggle', id: 1 });
-  const edits = { title: '전환', priority: 'normal' };
+  const edits = { title: '전환', priority: 'none' };
   data = reduce(data, { type: 'edit', id: 1, changes: { ...edits, recurrence: { type: 'daily', startDate: '2026-09-07' } } });
   assert.equal(core.visibleTodos(data, 'all', '2026-09-07')[0].completed, true);
   assert.equal(data.completions.length, 1);
@@ -191,10 +208,34 @@ test('기존 데이터 이전: ID·필드·순서·이전 저장 원본 보존',
   disk.set(oldKey, JSON.stringify(legacy));
   const data = await storage.loadData(now);
   assert.equal(ids(data.todos), '10,15'); assert.equal(data.todos[0].completedAt, now);
+  assert.deepEqual(plain(data.todos.map((todo) => todo.priority)), ['high', 'veryHigh']);
   assert.equal(data.nextId, 16); assert.equal(data.todos[1].dueDate, '2026-09-09');
   await storage.saveData(data);
   assert.equal(disk.get(oldKey), JSON.stringify(legacy));
   assert.deepEqual(plain(await storage.loadData(tomorrow)), plain(data));
+});
+
+test('스키마 2의 이전 기록·회차 snapshot 우선순위는 안전하게 정규화한다', () => {
+  const item = (id, priority) => ({ id, title: `일 ${id}`, priority, completed: false });
+  const raw = JSON.stringify({ ...core.emptyData(), schemaVersion: 2, todos: [item(1, 'high'), item(2, 'normal'), item(3, 'low'), item(4, 'unknown'), item(5, undefined)],
+    history: [{ ...item(6, 'normal'), completedAt: now }], completions: [{ todoId: 7, occurrenceDate: '2026-09-07', completedAt: now, snapshot: item(7, 'low') }] });
+  const storage = fixture().storage;
+  const parsed = storage.parseData(raw);
+  assert.deepEqual(plain(parsed.todos.map((todo) => todo.priority)), ['veryHigh', 'high', 'medium', 'none', 'none']);
+  assert.equal(parsed.history[0].priority, 'high'); assert.equal(parsed.completions[0].snapshot.priority, 'medium');
+});
+
+test('스키마 3은 새 우선순위를 원본 JSON과 재복원에서 그대로 보존한다', async () => {
+  const { storage, disk } = fixture();
+  const item = (id, priority) => ({ id, title: `새 일 ${id}`, priority, completed: false });
+  const data = { ...core.emptyData(), nextId: 7, todos: [item(1, 'veryHigh'), item(2, 'high'), item(3, 'medium'), item(4, 'none')],
+    history: [{ ...item(5, 'high'), completedAt: now }], completions: [{ todoId: 6, occurrenceDate: '2026-09-07', completedAt: now, snapshot: item(6, 'medium') }] };
+  await storage.saveData(data);
+  const stored = JSON.parse(disk.get(newKey));
+  assert.equal(stored.schemaVersion, 3);
+  assert.deepEqual(stored.todos.map((todo) => todo.priority), ['veryHigh', 'high', 'medium', 'none']);
+  assert.equal(stored.history[0].priority, 'high'); assert.equal(stored.completions[0].snapshot.priority, 'medium');
+  assert.deepEqual(plain(await storage.loadData(now)), plain(data));
 });
 
 test('전체 저장 왕복: 리스트·기한·반복·History·회차 완료', async () => {
@@ -203,8 +244,8 @@ test('전체 저장 왕복: 리스트·기한·반복·History·회차 완료', 
   data = reduce(data, { type: 'add', title: '과제', listId: 1 });
   data = reduce(data, { type: 'toggle', id: 1 });
   data = reduce(data, { type: 'day' }, tomorrow);
-  data = reduce(data, { type: 'add', title: '복습', priority: 'high', listId: 1 }, tomorrow);
-  data = reduce(data, { type: 'edit', id: 2, changes: { title: '복습', priority: 'high', listId: 1, dueDate: '2026-09-08', recurrence: { type: 'weekly', weekdays: [2], startDate: '2026-09-08' } } }, tomorrow);
+  data = reduce(data, { type: 'add', title: '복습', priority: 'veryHigh', listId: 1 }, tomorrow);
+  data = reduce(data, { type: 'edit', id: 2, changes: { title: '복습', priority: 'veryHigh', listId: 1, dueDate: '2026-09-08', recurrence: { type: 'weekly', weekdays: [2], startDate: '2026-09-08' } } }, tomorrow);
   data = reduce(data, { type: 'toggle', id: 2 }, tomorrow);
   await storage.saveData(data);
   assert.deepEqual(plain(await storage.loadData(tomorrow)), plain(data));
@@ -216,7 +257,7 @@ test('느린 저장 순서·실패 복구·손상 데이터 원본 보존', asyn
   let release; control.hold = new Promise((resolve) => { release = resolve; });
   const first = storage.saveData(firstData); await tick();
   const second = storage.saveData(secondData); await tick(); assert.equal(calls.length, 1);
-  release(); await Promise.all([first, second]); assert.equal(disk.get(newKey), JSON.stringify(secondData));
+  release(); await Promise.all([first, second]); assert.deepEqual(plain(await storage.loadData(now)), plain(secondData));
   control.writeFails = true; await assert.rejects(storage.saveData(firstData));
   control.writeFails = false; await storage.saveData(secondData);
   for (const broken of ['{broken', '{}', JSON.stringify({ ...secondData, todos: [null] }), JSON.stringify({ ...secondData, todos: [secondData.todos[0], secondData.todos[0]] })]) {
@@ -363,7 +404,7 @@ test('시작 화면: ready 전 탭 미생성, 오류 재시도, 첫 배치 후 �
 });
 
 test('실제 완료 통계: 자정 이동 전후 동일·중복 제거·완료 취소·7일 0 포함·주 경계', () => {
-  let data = reduce(core.emptyData(), { type: 'add', title: '오늘', priority: 'high' });
+  let data = reduce(core.emptyData(), { type: 'add', title: '오늘', priority: 'veryHigh' });
   data = reduce(data, { type: 'toggle', id: 1 });
   let result = stats.getStatistics(data, '2026-09-07');
   assert.equal(result.todayCount, 1); assert.equal(result.weekCount, 1); assert.equal(result.todos.todayCompleted, 1);
@@ -384,7 +425,7 @@ test('일반 Todo 통계: 루틴 제외·기한 경계·History 이동·완료 �
   for (const [id, dueDate] of [[2, '2026-09-06'], [3, '2026-09-07'], [4, '2026-09-08']]) {
     data = reduce(data, { type: 'edit', id, changes: { ...data.todos[id - 1], dueDate } });
   }
-  data = reduce(data, { type: 'edit', id: 6, changes: { title: '루틴', priority: 'normal', recurrence: { type: 'daily', startDate: '2026-09-07' } } });
+  data = reduce(data, { type: 'edit', id: 6, changes: { title: '루틴', priority: 'none', recurrence: { type: 'daily', startDate: '2026-09-07' } } });
   data = reduce(reduce(data, { type: 'toggle', id: 1 }), { type: 'toggle', id: 6 });
   assert.equal(stats.getStatistics(data, '2026-09-07').todayCount, 2);
   assert.deepEqual(plain(stats.getStatistics(data, '2026-09-07').todos), {
@@ -404,14 +445,14 @@ test('일반 Todo 통계: 루틴 제외·기한 경계·History 이동·완료 �
 
 test('루틴 통계: 현재 규칙 예정·삭제된 완료 보존·빈 분모·월말 회차', () => {
   let data = reduce(core.emptyData(), { type: 'add', title: '매일' });
-  data = reduce(data, { type: 'edit', id: 1, changes: { title: '매일', priority: 'normal', recurrence: { type: 'daily', startDate: '2026-09-07' } } });
+  data = reduce(data, { type: 'edit', id: 1, changes: { title: '매일', priority: 'none', recurrence: { type: 'daily', startDate: '2026-09-07' } } });
   data = reduce(data, { type: 'toggle', id: 1 });
   assert.deepEqual(plain(stats.getStatistics(data, '2026-09-07').routines), { completed: 1, scheduled: 7, rate: 14 });
   data = reduce(data, { type: 'delete', id: 1 });
   assert.equal(stats.getStatistics(data, '2026-09-07').todayCount, 1);
   assert.equal(stats.getStatistics(data, '2026-09-07').routines.rate, 100);
   assert.equal(stats.getStatistics(core.emptyData(), '2026-09-07').routines.rate, 0);
-  const monthly = { ...core.emptyData(), todos: [{ id: 1, title: '월말', priority: 'normal', completed: false,
+  const monthly = { ...core.emptyData(), todos: [{ id: 1, title: '월말', priority: 'none', completed: false,
     recurrence: { type: 'monthly', startDate: '2026-01-01', day: 31 } }] };
   assert.equal(stats.getStatistics(monthly, '2026-02-28').routines.scheduled, 1);
 });
@@ -457,6 +498,119 @@ test('Hook: 전체 삭제 실패시 화면 보존·중복 실행/삭제 중 입�
   assert.equal(await hook.resetAllData(), false); release(); assert.equal(await pending, true);
   hook = h.render(); assert.equal(hook.todos.length, 0); assert.equal(hook.profile.displayName, '사용자');
   assert.equal(hook.settings.characterReactions, true); assert.equal(resets, 2); h.unmount();
+});
+
+test('Widget views read current storage and separate Today from all incomplete Todos', async () => {
+  const { storage } = fixture();
+  const data = { ...core.emptyData(), todos: [
+    { id: 1, title: 'undated', priority: 'high', completed: false },
+    { id: 2, title: 'today', priority: 'veryHigh', completed: false, dueDate: '2026-09-07' },
+    { id: 3, title: 'completed', priority: 'veryHigh', completed: true, dueDate: '2026-09-07' },
+    { id: 4, title: 'future', priority: 'veryHigh', completed: false, dueDate: '2026-09-08' },
+    { id: 5, title: 'recurring', priority: 'medium', completed: false, recurrence: { type: 'daily', startDate: '2026-09-07' } },
+  ], nextId: 6 };
+  await storage.saveData(data);
+  const loaded = await storage.loadDataWithDiagnostics(now);
+  assert.equal(loaded.rawExists, true); assert.equal(loaded.key, newKey);
+  assert.equal(ids(core.getTodoSummary(core.visibleTodos(loaded.data, 'today', '2026-09-07')).incompleteTodos), '2,5');
+  assert.equal(ids(core.getTodoSummary(core.visibleTodos(loaded.data, 'all', '2026-09-07')).incompleteTodos), '2,4,1,5');
+
+  const legacy = fixture();
+  legacy.disk.set(oldKey, JSON.stringify([{ id: 9, title: 'legacy', priority: 'normal', completed: false }]));
+  const legacyLoaded = await legacy.storage.loadDataWithDiagnostics(now);
+  assert.equal(legacyLoaded.key, oldKey); assert.equal(legacyLoaded.rawExists, true);
+  assert.equal(ids(legacyLoaded.data.todos), '9');
+
+  const empty = fixture();
+  const emptyLoaded = await empty.storage.loadDataWithDiagnostics(now);
+  assert.equal(emptyLoaded.key, newKey); assert.equal(emptyLoaded.rawExists, false);
+});
+
+test('Widget modes share rendered Todo selection and isolate refresh actions', () => {
+  const element = (type, props) => ({ type, props });
+  const widget = load('src/widgets/todo-widget.tsx', {
+    'react-native-android-widget': { FlexWidget: 'FlexWidget', ImageWidget: 'ImageWidget', TextWidget: 'TextWidget' },
+    '@/utils/todo-state': core,
+    '../../assets/widgets/refresh-icon.png': 1,
+    'react/jsx-runtime': { jsx: element, jsxs: element },
+  });
+  const handler = load('src/widgets/todo-widget-handler.ts', {
+    'react-native-android-widget': { registerWidgetTaskHandler() {} },
+    '@/storage/todo-storage': {}, '@/utils/due-date': dates, '@/utils/todo-state': core,
+    '@/widgets/todo-widget': { renderTodoWidget() { return null; } },
+  });
+  const data = { ...core.emptyData(), todos: [
+    { id: 1, title: 'undated', priority: 'high', completed: false },
+    { id: 2, title: 'today', priority: 'veryHigh', completed: false, dueDate: '2026-09-07' },
+    { id: 3, title: 'completed', priority: 'veryHigh', completed: true, dueDate: '2026-09-07' },
+  ] };
+  assert.equal(handler.todoWidgetMode(handler.TODO_WIDGET_NAME), 'today');
+  assert.equal(handler.todoWidgetMode(handler.ALL_TODO_WIDGET_NAME), 'all');
+  assert.equal(ids(widget.getTodoWidgetTodos(data, '2026-09-07', 'today')), '2');
+  assert.equal(ids(widget.getTodoWidgetTodos(data, '2026-09-07', 'all')), '2,1');
+  const nodes = [];
+  function visit(node) {
+    if (Array.isArray(node)) { node.forEach(visit); return; }
+    if (!node || typeof node !== 'object') return;
+    if (typeof node.type === 'function') { visit(node.type(node.props)); return; }
+    nodes.push(node); const children = node.props?.children;
+    visit(children);
+  }
+  visit(widget.renderTodoWidget(data, '2026-09-07', 'all', { refreshing: true }).light);
+  assert.equal(nodes.filter((node) => node.props?.clickAction === 'TOGGLE_TODO').map((node) => node.props.clickActionData.id).join(','), '2,1');
+  assert.ok(nodes.some((node) => node.props?.text === '전체 Todo'));
+  assert.ok(nodes.some((node) => node.props?.text === '할 일 2개'));
+  assert.ok(nodes.some((node) => node.props?.text === '!!!'));
+  const refresh = nodes.find((node) => node.props?.clickAction === 'REFRESH_TODOS');
+  assert.deepEqual(plain({ width: refresh.props.style.width, height: refresh.props.style.height }), { width: 36, height: 36 });
+  const rotatingIcon = nodes.find((node) => node.type === 'ImageWidget');
+  assert.equal(rotatingIcon.props.style.rotation, 90);
+  nodes.length = 0;
+  visit(widget.renderTodoWidget(data, '2026-09-07', 'today').light);
+  assert.equal(nodes.filter((node) => node.props?.clickAction === 'TOGGLE_TODO').map((node) => node.props.clickActionData.id).join(','), '2');
+  assert.ok(nodes.some((node) => node.props?.text === '오늘 Todo'));
+  assert.ok(nodes.some((node) => node.type === 'ImageWidget' && node.props?.imageWidth === 24 && node.props?.imageHeight === 24));
+  const header = nodes.find((node) => node.type === 'FlexWidget' && node.props?.style?.justifyContent === 'space-between');
+  assert.deepEqual(plain({ width: header.props.style.width, direction: header.props.style.flexDirection }), { width: 'match_parent', direction: 'row' });
+  nodes.length = 0;
+  visit(widget.renderTodoWidget(core.emptyData(), '2026-09-07', 'today').light);
+  assert.ok(nodes.some((node) => node.props?.text === '오늘 할 일이 없어요'));
+  nodes.length = 0;
+  visit(widget.renderTodoWidget(core.emptyData(), '2026-09-07', 'today', { refreshing: true }).light);
+  assert.ok(nodes.some((node) => node.props?.text === '새로고침 중이에요...'));
+  nodes.length = 0;
+  visit(widget.renderTodoWidget(core.emptyData(), '2026-09-07', 'all').light);
+  assert.ok(nodes.some((node) => node.props?.text === '할 일이 없어요'));
+  assert.equal(handler.isTodoWidgetRefreshAction('WIDGET_CLICK', 'REFRESH_TODOS'), true);
+  assert.equal(handler.isTodoWidgetRefreshAction('WIDGET_CLICK', 'TOGGLE_TODO'), false);
+  assert.equal(handler.isTodoWidgetRefreshAction('WIDGET_UPDATE', 'REFRESH_TODOS'), false);
+});
+
+test('Widget refresh feedback reloads without saving', async () => {
+  let registered; let saveCalls = 0;
+  const data = { ...core.emptyData(), todos: [{ id: 1, title: 'today', priority: 'none', completed: false, dueDate: '2026-09-07' }] };
+  const handler = load('src/widgets/todo-widget-handler.ts', {
+    'react-native-android-widget': { registerWidgetTaskHandler(callback) { registered = callback; } },
+    '@/storage/todo-storage': {
+      loadDataWithDiagnostics: async () => ({ data, rawExists: true, key: newKey }),
+      saveData: async () => { saveCalls++; },
+    },
+    '@/utils/due-date': dates, '@/utils/todo-state': core,
+    '@/widgets/todo-widget': {
+      renderTodoWidget: (renderData, today, mode, options = {}) => ({ renderData, today, mode, refreshing: options.refreshing ?? false }),
+    },
+  }, {
+    __DEV__: false,
+    setTimeout: (callback, delay) => { assert.equal(delay, 400); callback(); return 1; },
+  });
+  handler.registerTodoWidgetHandler();
+  const renders = [];
+  await registered({
+    widgetInfo: { widgetName: handler.TODO_WIDGET_NAME }, widgetAction: 'WIDGET_CLICK', clickAction: 'REFRESH_TODOS',
+    renderWidget: (representation) => renders.push(representation),
+  });
+  assert.equal(renders.length, 2); assert.equal(renders[0].refreshing, true); assert.equal(renders[1].refreshing, false);
+  assert.equal(saveCalls, 0);
 });
 
 (async () => {

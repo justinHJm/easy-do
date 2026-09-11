@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import { loadData, saveData, resetStoredData } from '@/storage/todo-storage';
 import { emptyData, initializeLocalData, getTodoSummary, rollover, updateData, visibleTodos, type DataAction } from '@/utils/todo-state';
 import { dateKey } from '@/utils/due-date';
@@ -7,6 +7,15 @@ import type { HydrationState, TodoData, TodoEdits, TodoPriority, TodoView } from
 
 // 표시 시간을 늘리는 지연이 아니라 응답하지 않는 저장소에서 빠져나오기 위한 최대 대기 시간입니다.
 export const HYDRATION_TIMEOUT_MS = 15000;
+
+function refreshTodoWidget() {
+  // 앱 실행 환경에서만 위젯 모듈을 불러와 기존 저장소 단위 검사를 유지합니다.
+  void import('@/widgets/request-todo-widget-update')
+    .then(({ requestTodoWidgetUpdate }) => requestTodoWidgetUpdate())
+    .catch((error: unknown) => {
+      if (Platform?.OS === 'android') console.warn('Todo widget update failed', error);
+    });
+}
 
 export function useTodos() {
   const [data, setData] = useState<TodoData>(emptyData);
@@ -29,10 +38,12 @@ export function useTodos() {
     return () => { mounted.current = false; };
   }, []);
 
-  const persist = useCallback((next: TodoData) => {
+  const persist = useCallback((next: TodoData, refreshWidget = false) => {
     const version = ++writeVersion.current;
     void saveData(next).then(() => {
       if (mounted.current && version === writeVersion.current) setStorageError(null);
+      if (typeof __DEV__ !== 'undefined' && __DEV__) console.info('Todo persisted', { todoCount: next.todos.length });
+      if (refreshWidget) refreshTodoWidget();
     }).catch(() => {
       if (mounted.current && version === writeVersion.current) setStorageError('저장하지 못했어요. 다시 시도해 주세요.');
     });
@@ -89,7 +100,7 @@ export function useTodos() {
     if (next !== current.current) {
       current.current = next;
       setData(next);
-      persist(next);
+      persist(next, true);
     }
   }, [persist]);
 
@@ -122,6 +133,7 @@ export function useTodos() {
       current.current = initial;
       queued.current = [];
       if (mounted.current) { setData(initial); setToday(dateKey(new Date())); setStorageError(null); }
+      refreshTodoWidget();
       return true;
     } catch {
       if (mounted.current) setStorageError('데이터를 삭제하지 못했어요. 다시 시도해 주세요.');
@@ -134,7 +146,7 @@ export function useTodos() {
     resetAllData,
     updateProfile: (displayName: string, avatar: string) => send({ type: 'profile', displayName, avatar }),
     updateSettings: (changes: { characterReactions?: boolean; welcomeMessages?: boolean }) => send({ type: 'settings', changes }),
-    addTodo: (title: string, priority: TodoPriority = 'normal', listId?: number) => send({ type: 'add', title, priority, listId }),
+    addTodo: (title: string, priority: TodoPriority = 'none', listId?: number) => send({ type: 'add', title, priority, listId }),
     editTodo: (id: number, changes: TodoEdits) => send({ type: 'edit', id, changes }),
     deleteTodo: (id: number) => send({ type: 'delete', id }),
     toggleTodo: (id: number, occurrenceDate?: string) => send({ type: 'toggle', id, occurrenceDate }),

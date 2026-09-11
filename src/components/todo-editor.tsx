@@ -55,7 +55,7 @@ export function TodoEditor({ todo, lists, onSave, onDelete, onClose }: {
                   accessibilityState={{ expanded: showPriority }} style={styles.field} onPress={() => setShowPriority((value) => !value)}>
                   <PriorityBadge priority={priority} /><Text>▾</Text>
                 </Pressable>
-                {showPriority && <View style={styles.row}>{(['high', 'normal', 'low'] as const).map((value) => (
+                {showPriority && <View style={styles.row}>{(['veryHigh', 'high', 'medium', 'none'] as const).map((value) => (
                   <Pressable key={value} accessibilityRole="radio" accessibilityState={{ checked: priority === value }}
                     accessibilityLabel={priorityLabels[value]} style={styles.button} onPress={() => { setPriority(value); setShowPriority(false); }}><PriorityBadge priority={value} /></Pressable>
                 ))}</View>}
