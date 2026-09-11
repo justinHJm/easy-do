@@ -1,6 +1,26 @@
-# easy-do v0.1.1
+# easy-do
 
-React Native · Expo SDK 57 · TypeScript로 만든 Android Todo 앱입니다.
+간단하고 가볍게 할 일을 관리할 수 있는 Android Todo 앱입니다. 우선순위, 기한, 반복 Todo와 Android 홈 화면 위젯을 지원합니다.
+
+A simple Android Todo app for managing tasks with priorities, due dates, recurring todos, and Android home screen widgets.
+
+## 소개 | About
+
+easy-do는 React Native, Expo SDK 57, TypeScript로 만든 개인 학습·개발 프로젝트입니다. 복잡한 기능보다 빠르게 기록하고 확인하는 Todo 경험에 집중합니다.
+
+easy-do is a personal learning and development project built with React Native, Expo SDK 57, and TypeScript. It focuses on a clear, lightweight Todo experience for quickly capturing and reviewing tasks.
+
+### 주요 기능 | Highlights
+
+- Todo 생성, 수정, 완료, 삭제 및 완료 기록 관리
+- 우선순위, 기한, 반복 Todo, 사용자 목록과 보기 필터
+- Android 홈 화면의 오늘 Todo·전체 Todo 위젯
+- 한국어 중심 UI와 라이트·다크 모드 지원
+
+- Create, edit, complete, delete, and review Todo history
+- Priorities, due dates, recurring todos, custom lists, and view filters
+- Today Todo and All Todo widgets for the Android home screen
+- Korean-first UI with light and dark mode support
 공식 기준 문서: https://docs.expo.dev/versions/v57.0.0/
 
 ## 실행과 검사
