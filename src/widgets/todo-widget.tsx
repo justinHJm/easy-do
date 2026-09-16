@@ -2,6 +2,7 @@
 
 import { FlexWidget, ImageWidget, TextWidget, type WidgetRepresentation } from 'react-native-android-widget';
 
+import { dueLabel, localDate } from '@/utils/due-date';
 import { getTodoSummary, prioritySymbols, visibleTodos } from '@/utils/todo-state';
 import type { TodoData } from '@/types/todo';
 
@@ -26,6 +27,14 @@ export type TodoWidgetMode = 'today' | 'all';
 
 export function getTodoWidgetTodos(data: TodoData, today: string, mode: TodoWidgetMode) {
   return getTodoSummary(visibleTodos(data, mode, today)).incompleteTodos;
+}
+
+export function widgetDueLabel(value: string, today: string) {
+  const due = dueLabel(value, localDate(today));
+  if (due.days <= 7) return due.text;
+  const [year, month, day] = value.split('-').map(Number);
+  const compactDate = `${String(month).padStart(2, '0')}/${String(day).padStart(2, '0')}`;
+  return year === localDate(today).getFullYear() ? compactDate : `${String(year).slice(-2)}/${compactDate}`;
 }
 
 function TodoWidgetContent({ data, today, colors, mode, refreshing }: {
@@ -59,8 +68,9 @@ function TodoWidgetContent({ data, today, colors, mode, refreshing }: {
         <FlexWidget style={{ flex: 1, justifyContent: 'center' }}>
           <TextWidget text={emptyText} style={{ color: colors.muted, fontSize: 14, textAlign: 'center' }} />
         </FlexWidget>
-      ) : todos.map((todo) => (
-        <FlexWidget key={`${todo.id}-${todo.occurrenceDate ?? ''}`} style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+      ) : todos.map((todo) => {
+        const dueText = mode === 'all' && todo.dueDate ? widgetDueLabel(todo.dueDate, today) : undefined;
+        return <FlexWidget key={`${todo.id}-${todo.occurrenceDate ?? ''}`} style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
           <TextWidget
             text="○"
             clickAction="TOGGLE_TODO"
@@ -70,8 +80,9 @@ function TodoWidgetContent({ data, today, colors, mode, refreshing }: {
           <FlexWidget style={{ flex: 1 }}>
             <TextWidget text={todo.title} truncate="END" maxLines={1} style={{ color: colors.text, fontSize: 14 }} />
           </FlexWidget>
+          {dueText && <TextWidget text={dueText} truncate="END" maxLines={1} style={{ color: colors.muted, fontSize: 11, marginLeft: 6 }} />}
         </FlexWidget>
-      ))}
+      })}
     </FlexWidget>
   );
 }

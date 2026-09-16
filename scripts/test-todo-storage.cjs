@@ -530,6 +530,7 @@ test('Widget modes share rendered Todo selection and isolate refresh actions', (
   const element = (type, props) => ({ type, props });
   const widget = load('src/widgets/todo-widget.tsx', {
     'react-native-android-widget': { FlexWidget: 'FlexWidget', ImageWidget: 'ImageWidget', TextWidget: 'TextWidget' },
+    '@/utils/due-date': dates,
     '@/utils/todo-state': core,
     '../../assets/widgets/refresh-icon.png': 1,
     'react/jsx-runtime': { jsx: element, jsxs: element },
@@ -548,6 +549,13 @@ test('Widget modes share rendered Todo selection and isolate refresh actions', (
   assert.equal(handler.todoWidgetMode(handler.ALL_TODO_WIDGET_NAME), 'all');
   assert.equal(ids(widget.getTodoWidgetTodos(data, '2026-09-07', 'today')), '2');
   assert.equal(ids(widget.getTodoWidgetTodos(data, '2026-09-07', 'all')), '2,1');
+  assert.equal(widget.widgetDueLabel('2026-09-06', '2026-09-07'), '기한 지남');
+  assert.equal(widget.widgetDueLabel('2026-09-07', '2026-09-07'), '오늘까지');
+  assert.equal(widget.widgetDueLabel('2026-09-08', '2026-09-07'), '내일까지');
+  assert.equal(widget.widgetDueLabel('2026-09-14', '2026-09-07'), '7일 남음');
+  assert.equal(widget.widgetDueLabel('2026-09-15', '2026-09-07'), '09/15');
+  assert.equal(widget.widgetDueLabel('2026-09-30', '2026-09-07'), '09/30');
+  assert.equal(widget.widgetDueLabel('2027-01-01', '2026-09-07'), '27/01/01');
   const nodes = [];
   function visit(node) {
     if (Array.isArray(node)) { node.forEach(visit); return; }
@@ -561,6 +569,7 @@ test('Widget modes share rendered Todo selection and isolate refresh actions', (
   assert.ok(nodes.some((node) => node.props?.text === '전체 Todo'));
   assert.ok(nodes.some((node) => node.props?.text === '할 일 2개'));
   assert.ok(nodes.some((node) => node.props?.text === '!!!'));
+  assert.ok(nodes.some((node) => node.props?.text === '오늘까지'));
   const refresh = nodes.find((node) => node.props?.clickAction === 'REFRESH_TODOS');
   assert.deepEqual(plain({ width: refresh.props.style.width, height: refresh.props.style.height }), { width: 36, height: 36 });
   const rotatingIcon = nodes.find((node) => node.type === 'ImageWidget');
@@ -569,6 +578,7 @@ test('Widget modes share rendered Todo selection and isolate refresh actions', (
   visit(widget.renderTodoWidget(data, '2026-09-07', 'today').light);
   assert.equal(nodes.filter((node) => node.props?.clickAction === 'TOGGLE_TODO').map((node) => node.props.clickActionData.id).join(','), '2');
   assert.ok(nodes.some((node) => node.props?.text === '오늘 Todo'));
+  assert.ok(!nodes.some((node) => node.props?.text === '오늘까지'));
   assert.ok(nodes.some((node) => node.type === 'ImageWidget' && node.props?.imageWidth === 24 && node.props?.imageHeight === 24));
   const header = nodes.find((node) => node.type === 'FlexWidget' && node.props?.style?.justifyContent === 'space-between');
   assert.deepEqual(plain({ width: header.props.style.width, direction: header.props.style.flexDirection }), { width: 'match_parent', direction: 'row' });

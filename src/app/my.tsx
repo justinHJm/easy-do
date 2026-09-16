@@ -1,6 +1,6 @@
 import Constants from 'expo-constants';
 import { useRef, useState } from 'react';
-import { ActivityIndicator, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Image, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Colors } from '@/constants/theme';
@@ -11,6 +11,7 @@ import { getCompletionRecords } from '@/utils/todo-statistics';
 import { prioritySymbols } from '@/utils/todo-state';
 
 const avatars = ['idle', 'welcome', 'completed', 'cheer'] as const;
+const FEEDBACK_FORM_URL = 'https://forms.gle/8WgBa7U6EETHXhs18';
 type Avatar = typeof avatars[number];
 const avatarLabels = { idle: '기본', welcome: '인사', completed: '기쁨', cheer: '응원' };
 const priorityLabels = { veryHigh: '매우 높음', high: '높음', medium: '보통', none: '없음' };
@@ -42,6 +43,13 @@ export default function MyScreen() {
     } catch { setResetError('삭제하지 못했어요. 다시 시도해 주세요.'); }
     finally { resetInFlight.current = false; setResetting(false); }
   }
+  async function openFeedbackForm() {
+    try {
+      await Linking.openURL(FEEDBACK_FORM_URL);
+    } catch {
+      setNotice('의견 보내기 화면을 열지 못했어요. 다시 시도해 주세요.');
+    }
+  }
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
       <ScrollView contentContainerStyle={styles.content}>
@@ -60,6 +68,9 @@ export default function MyScreen() {
         <View style={styles.section}><Text style={styles.heading}>설정</Text>
           <View style={styles.row}><View style={styles.grow}><Text style={styles.text}>캐릭터 반응</Text><Text style={styles.muted}>할 일을 완료하면 반응해요</Text></View><Switch accessibilityLabel="캐릭터 반응" value={settings.characterReactions !== false} onValueChange={(value) => updateSettings({ characterReactions: value })} trackColor={{ true: '#B9DCC7' }} thumbColor={settings.characterReactions !== false ? Colors.light.primary : '#F4F4F4'} /></View>
           <View style={styles.row}><View style={styles.grow}><Text style={styles.text}>환영 메시지</Text><Text style={styles.muted}>시작할 때 반갑게 인사해요</Text></View><Switch accessibilityLabel="환영 메시지" value={settings.welcomeMessages !== false} onValueChange={(value) => updateSettings({ welcomeMessages: value })} trackColor={{ true: '#B9DCC7' }} thumbColor={settings.welcomeMessages !== false ? Colors.light.primary : '#F4F4F4'} /></View>
+        </View>
+        <View style={styles.section}><Text style={styles.heading}>도움말</Text>
+          <Pressable accessibilityRole="link" style={styles.row} onPress={() => { void openFeedbackForm(); }}><View style={styles.grow}><Text style={styles.text}>의견 보내기</Text><Text style={styles.muted}>불편한 점이나 개선할 점을 알려 주세요</Text></View><Text style={styles.muted}>열기 ›</Text></Pressable>
         </View>
         <View style={styles.section}><Text style={styles.heading}>데이터</Text><Pressable accessibilityRole="button" style={styles.row} onPress={() => { setResetStep(1); setResetError(null); setPanel('reset'); }}><Text style={styles.danger}>전체 데이터 삭제</Text><Text style={styles.muted}>›</Text></Pressable></View>
         <Text style={styles.version}>easy-do · 버전 {Constants.expoConfig?.version ?? '정보 없음'}</Text>
