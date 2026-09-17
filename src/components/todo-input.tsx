@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Keyboard, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { PriorityBadge, priorityLabels } from '@/components/priority-badge';
 import { Colors } from '@/constants/theme';
+import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
 import type { TodoList, TodoPriority } from '@/types/todo';
 import { ListChoices } from '@/components/todo-views';
 
@@ -10,6 +11,7 @@ const colors = Colors.light;
 export function TodoInput({ onAdd, lists, defaultListId, disabled }: {
   onAdd: (title: string, priority: TodoPriority, listId?: number) => void; lists: TodoList[]; defaultListId?: number; disabled: boolean;
 }) {
+  const layout = useResponsiveLayout();
   // useState로 입력 중인 내용과 선택값, 팝업 표시 여부를 기억합니다. 아직 추가하지 않은 내용은 저장하지 않습니다.
   const [title, setTitle] = useState('');
   const [priority, setPriority] = useState<TodoPriority>('none');
@@ -51,7 +53,7 @@ export function TodoInput({ onAdd, lists, defaultListId, disabled }: {
         <View style={styles.overlay}>
           <Pressable style={StyleSheet.absoluteFill} accessibilityRole="button" accessibilityLabel="우선순위 메뉴 닫기"
             onPress={() => setMenuOpen(false)} />
-          <View style={styles.menu} accessibilityViewIsModal><ScrollView keyboardShouldPersistTaps="handled">
+          <View style={[styles.menu, layout.size !== 'compact' && styles.wideMenu, { maxWidth: layout.modalMaxWidth }]} accessibilityViewIsModal><ScrollView keyboardShouldPersistTaps="handled">
             <View style={styles.menuHeader}>
               <Text style={styles.menuTitle}>우선순위</Text>
               <Pressable accessibilityRole="button" accessibilityLabel="닫기" onPress={() => setMenuOpen(false)} style={styles.close}>
@@ -81,7 +83,8 @@ const styles = StyleSheet.create({
   container: { paddingHorizontal: 16, paddingBottom: 4 },
   priorityButton: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 3 },
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.18)', justifyContent: 'center', alignItems: 'center' },
-  menu: { width: 280, maxWidth: '90%', maxHeight: '80%', backgroundColor: '#FFFFFF', borderRadius: 16, padding: 12, elevation: 6 },
+  menu: { width: 280, maxHeight: '80%', backgroundColor: '#FFFFFF', borderRadius: 16, padding: 12, elevation: 6 },
+  wideMenu: { width: '90%' },
   listButton: { minHeight: 32, justifyContent: 'center', alignSelf: 'flex-start', maxWidth: '100%' },
   menuHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   menuTitle: { color: colors.text, fontSize: 15, fontWeight: '600', paddingLeft: 12 },

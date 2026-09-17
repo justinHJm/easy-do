@@ -2,19 +2,20 @@ import { useState } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Colors } from '@/constants/theme';
 import type { TodoList, TodoView } from '@/types/todo';
+import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
 
 export const viewLabels = { all: '전체', today: '오늘', week: '이번 주', urgent: '기한 임박', routine: '루틴' };
 
-export function TodoViews({ view, lists, onChange, onManage }: {
-  view: TodoView; lists: TodoList[]; onChange: (view: TodoView) => void; onManage: () => void;
+export function TodoViews({ view, lists, onChange, onManage, vertical = false }: {
+  view: TodoView; lists: TodoList[]; onChange: (view: TodoView) => void; onManage: () => void; vertical?: boolean;
 }) {
   const options = [...Object.entries(viewLabels), ...lists.map((list) => [`list:${list.id}`, list.name])];
-  return <View><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
+  return <View style={vertical && styles.sidebar}><ScrollView horizontal={!vertical} style={vertical && styles.verticalScroll} showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.chips, vertical && styles.verticalChips]}>
     {options.map(([value, label]) => <Pressable key={value} accessibilityRole="tab" accessibilityState={{ selected: value === view }}
-      onPress={() => onChange(value as TodoView)} style={[styles.chip, value === view && styles.selected]}>
+      onPress={() => onChange(value as TodoView)} style={[styles.chip, vertical && styles.verticalChip, value === view && styles.selected]}>
       <Text style={value === view ? styles.green : styles.text}>{label}</Text>
     </Pressable>)}
-    <Pressable accessibilityRole="button" accessibilityLabel="리스트 추가 및 관리" onPress={onManage} style={styles.chip}><Text style={styles.green}>＋</Text></Pressable>
+    <Pressable accessibilityRole="button" accessibilityLabel="리스트 추가 및 관리" onPress={onManage} style={[styles.chip, vertical && styles.verticalChip]}><Text style={styles.green}>＋</Text></Pressable>
   </ScrollView></View>;
 }
 
@@ -32,6 +33,7 @@ export function ListManager({ lists, onAdd, onRename, onDelete, onClose }: {
   lists: TodoList[]; onAdd: (name: string) => void; onRename: (id: number, name: string) => void;
   onDelete: (id: number) => void; onClose: () => void;
 }) {
+  const layout = useResponsiveLayout();
   const [editingId, setEditingId] = useState<number>();
   const [name, setName] = useState('');
   const [deleting, setDeleting] = useState<TodoList>();
@@ -44,7 +46,7 @@ export function ListManager({ lists, onAdd, onRename, onDelete, onClose }: {
   }
   return <Modal transparent animationType="fade" onRequestClose={() => deleting ? setDeleting(undefined) : onClose()}>
     <KeyboardAvoidingView style={styles.overlay} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-      <View style={styles.panel} accessibilityViewIsModal><ScrollView keyboardShouldPersistTaps="handled">
+      <View style={[styles.panel, { maxWidth: layout.modalMaxWidth }]} accessibilityViewIsModal><ScrollView keyboardShouldPersistTaps="handled">
         {deleting ? <View style={styles.form}>
           <Text style={styles.heading}>리스트를 삭제할까요?</Text>
           <Text style={styles.text}>‘{deleting.name}’의 할 일은 삭제하지 않고 미분류로 옮겨요.</Text>
@@ -73,7 +75,11 @@ export function ListManager({ lists, onAdd, onRename, onDelete, onClose }: {
 
 const styles = StyleSheet.create({
   chips: { paddingHorizontal: 16, paddingVertical: 6, gap: 6 },
+  sidebar: { width: 176, alignSelf: 'stretch', borderRightWidth: 1, borderRightColor: '#E9EEE9' },
+  verticalScroll: { flex: 1 },
+  verticalChips: { paddingHorizontal: 8, paddingVertical: 8 },
   chip: { minHeight: 40, paddingHorizontal: 12, justifyContent: 'center', borderRadius: 12, backgroundColor: '#F3F5F3' },
+  verticalChip: { width: '100%' },
   selected: { backgroundColor: Colors.light.backgroundSelected }, green: { color: Colors.light.primary, fontWeight: '700' },
   text: { color: Colors.light.text, fontSize: 13 }, wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.22)', justifyContent: 'center', alignItems: 'center', padding: 20 },

@@ -14,10 +14,12 @@ import type { TodoView } from '@/types/todo';
 import { AppState } from 'react-native';
 import { ListManager, TodoViews, viewLabels } from '@/components/todo-views';
 import { localDate } from '@/utils/due-date';
+import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
 
 const colors = Colors.light;
 
 export default function HomeScreen() {
+  const layout = useResponsiveLayout();
   const { todos, lists, today, loaded, storageError, retryStorage, getView, addTodo, toggleTodo, editTodo, deleteTodo,
     addList, renameList, deleteList, profile, settings } = useTodoContext();
   const welcomeEnabled = settings.welcomeMessages !== false;
@@ -77,6 +79,7 @@ export default function HomeScreen() {
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
       <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <View style={[styles.content, { maxWidth: layout.contentMaxWidth }]}>
         <View style={styles.header}>
           <View style={styles.logo} accessible accessibilityLabel="easy-do">
             <View style={styles.sprout} importantForAccessibility="no-hide-descendants" aria-hidden>
@@ -95,12 +98,14 @@ export default function HomeScreen() {
             <View style={[styles.progress, { width: `${completionRate}%` }]} />
           </View>
         </View>
-        {reaction && <CharacterGreeting {...reaction} />}
+        {!layout.isCompactHeight && reaction && <CharacterGreeting {...reaction} />}
         {storageError && <Pressable accessibilityRole="button" onPress={retryStorage} style={styles.storageNotice}>
           <Text style={styles.error}>{storageError} · 다시 시도</Text>
         </Pressable>}
+        <View style={[styles.homeBody, layout.usesTwoPane && styles.wideBody]}>
+        <TodoViews vertical={layout.usesTwoPane} view={activeView} lists={lists} onChange={setView} onManage={() => { if (loaded) setManagingLists(true); }} />
+        <View style={styles.todoPane}>
         <TodoInput onAdd={addTodo} lists={lists} defaultListId={selectedList?.id} disabled={!loaded} />
-        <TodoViews view={activeView} lists={lists} onChange={setView} onManage={() => { if (loaded) setManagingLists(true); }} />
         <SectionList
           style={styles.list}
           contentContainerStyle={styles.listContent}
@@ -129,9 +134,12 @@ export default function HomeScreen() {
             return null;
           }}
         />
+        </View>
+        </View>
         {editingTodo && <TodoEditor key={editingTodo.id} todo={editingTodo} lists={lists}
           onSave={editTodo} onDelete={deleteTodo} onClose={() => setEditingId(undefined)} />}
         {managingLists && <ListManager lists={lists} onAdd={addList} onRename={renameList} onDelete={deleteList} onClose={() => setManagingLists(false)} />}
+        </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -139,6 +147,10 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
+  content: { flex: 1, width: '100%', alignSelf: 'center' },
+  homeBody: { flex: 1 },
+  wideBody: { flexDirection: 'row', gap: 12 },
+  todoPane: { flex: 1, minWidth: 0 },
   storageNotice: { paddingHorizontal: 16, paddingVertical: 6 }, error: { fontSize: 12, color: '#B52F3B' },
   header: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 12, gap: 6 },
   logo: { flexDirection: 'row', alignItems: 'center', gap: 6 },
