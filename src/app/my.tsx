@@ -9,7 +9,6 @@ import { ListManager } from '@/components/todo-views';
 import { useTodoContext } from '@/contexts/todo-context';
 import { getCompletionRecords } from '@/utils/todo-statistics';
 import { prioritySymbols } from '@/utils/todo-state';
-import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
 
 const avatars = ['idle', 'welcome', 'completed', 'cheer'] as const;
 const FEEDBACK_FORM_URL = 'https://forms.gle/8WgBa7U6EETHXhs18';
@@ -18,7 +17,6 @@ const avatarLabels = { idle: '기본', welcome: '인사', completed: '기쁨', c
 const priorityLabels = { veryHigh: '매우 높음', high: '높음', medium: '보통', none: '없음' };
 
 export default function MyScreen() {
-  const layout = useResponsiveLayout();
   const data = useTodoContext();
   const { profile, settings, lists, addList, renameList, deleteList, updateProfile, updateSettings, resetAllData, storageError, retryStorage, openTutorial } = data;
   const name = typeof profile.displayName === 'string' ? profile.displayName : '사용자';
@@ -54,7 +52,7 @@ export default function MyScreen() {
   }
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
-      <ScrollView contentContainerStyle={[styles.content, { maxWidth: layout.contentMaxWidth, paddingHorizontal: layout.horizontalPadding }]}>
+      <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.title}>마이</Text>
         <View style={styles.row}>
           <Image source={characterImages[avatar]} style={styles.avatar} resizeMode="contain" accessibilityLabel={`${avatarLabels[avatar]} 프로필 이미지`} />
@@ -81,7 +79,7 @@ export default function MyScreen() {
       {panel === 'lists' && <ListManager lists={lists} onAdd={addList} onRename={renameList} onDelete={deleteList} onClose={closePanel} />}
       {panel !== null && panel !== 'lists' && <Modal transparent animationType="fade" onRequestClose={closePanel}>
         <KeyboardAvoidingView style={styles.overlay} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-          <SafeAreaView style={[styles.modal, { maxWidth: layout.modalMaxWidth }]} accessibilityViewIsModal>
+          <SafeAreaView style={styles.modal} accessibilityViewIsModal>
             <View style={styles.row}><Text style={styles.heading}>{panel === 'profile' ? '프로필 편집' : panel === 'history' ? '완료 기록' : '전체 데이터 삭제'}</Text><Pressable accessibilityRole="button" disabled={resetting} style={styles.button} onPress={closePanel}><Text style={styles.green}>닫기</Text></Pressable></View>
             <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.form}>
               {panel === 'profile' && <>
@@ -106,7 +104,7 @@ export default function MyScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: Colors.light.background },
-  content: { paddingVertical: 20, gap: 20, paddingBottom: 32, width: '100%', alignSelf: 'center' },
+  content: { padding: 20, gap: 20, paddingBottom: 32, width: '100%', maxWidth: 640, alignSelf: 'center' },
   title: { fontSize: 22, fontWeight: '700', color: Colors.light.text },
   heading: { fontSize: 17, fontWeight: '700', color: Colors.light.text, flexShrink: 1 },
   text: { fontSize: 15, color: Colors.light.text, flexShrink: 1 },

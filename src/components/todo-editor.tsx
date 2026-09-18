@@ -7,12 +7,10 @@ import { TodoCalendar } from '@/components/todo-calendar';
 import { dateKey, fullDate } from '@/utils/due-date';
 import { ListChoices } from '@/components/todo-views';
 import { RecurrencePicker } from '@/components/recurrence-picker';
-import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
 
 export function TodoEditor({ todo, lists, onSave, onDelete, onClose }: {
   todo: Todo; lists: TodoList[]; onSave: (id: number, changes: TodoEdits) => void; onDelete: (id: number) => void; onClose: () => void;
 }) {
-  const layout = useResponsiveLayout();
   // 원본이 아닌 편집 사본을 유지합니다. 닫기·뒤로 가기는 저장하지 않은 변경을 버립니다.
   const [title, setTitle] = useState(todo.title);
   const [priority, setPriority] = useState<TodoPriority>(todo.priority);
@@ -34,7 +32,7 @@ export function TodoEditor({ todo, lists, onSave, onDelete, onClose }: {
     <Modal transparent visible animationType="fade" onRequestClose={close}>
       <KeyboardAvoidingView style={styles.overlay} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <Pressable style={StyleSheet.absoluteFill} accessibilityRole="button" accessibilityLabel="수정 화면 닫기" onPress={close} />
-        <View style={[styles.panel, { maxWidth: layout.modalMaxWidth }]} accessibilityViewIsModal>
+        <View style={styles.panel} accessibilityViewIsModal>
           <ScrollView keyboardShouldPersistTaps="handled">
             {page === 'calendar' ? <TodoCalendar value={dueDate} onCancel={() => setPage('edit')}
               onConfirm={(value) => { setDueDate(value); setPage('edit'); }} /> : page === 'delete' ? (

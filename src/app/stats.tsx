@@ -6,13 +6,11 @@ import { Colors, Spacing } from '@/constants/theme';
 import { useTodoContext } from '@/contexts/todo-context';
 import { localDate } from '@/utils/due-date';
 import { getStatistics } from '@/utils/todo-statistics';
-import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
 
 const colors = Colors.light;
 const shortDate = (date: string) => `${Number(date.slice(5, 7))}/${Number(date.slice(8))}`;
 
 export default function StatsScreen() {
-  const layout = useResponsiveLayout();
   const data = useTodoContext();
   // 통계용 상태를 따로 저장하지 않아 완료 취소·삭제·자정 정리가 즉시 같은 원본에 반영됩니다.
   const stats = getStatistics(data, data.today);
@@ -20,7 +18,7 @@ export default function StatsScreen() {
 
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
-      <ScrollView contentContainerStyle={[styles.content, { maxWidth: layout.contentMaxWidth, paddingHorizontal: layout.horizontalPadding }]}>
+      <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.title}>통계</Text>
         {!data.loaded ? <View style={styles.card}>
           <Text style={styles.note}>{data.hydrationState === 'error' ? data.storageError : '완료 기록을 불러오고 있어요.'}</Text>
@@ -93,7 +91,7 @@ export default function StatsScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
-  content: { width: '100%', alignSelf: 'center', paddingVertical: Spacing.three, paddingBottom: Spacing.four, gap: 12 },
+  content: { padding: Spacing.three, paddingBottom: Spacing.four, gap: 12 },
   title: { fontSize: 22, fontWeight: '700', color: colors.text, marginBottom: 4 },
   card: { backgroundColor: colors.backgroundElement, borderRadius: 16, padding: 16, gap: 10 },
   summary: { flexDirection: 'row', gap: 12 }, summaryCard: { flex: 1 },
