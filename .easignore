@@ -1,3 +1,6 @@
+# Keep this file aligned with .gitignore. EAS uses it instead of .gitignore
+# when creating the uploaded build archive.
+
 # Dependencies and package-manager caches
 node_modules/
 /.npm-cache/
