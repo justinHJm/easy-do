@@ -20,7 +20,7 @@ const priorityLabels = { veryHigh: '매우 높음', high: '높음', medium: '보
 export default function MyScreen() {
   const layout = useResponsiveLayout();
   const data = useTodoContext();
-  const { profile, settings, lists, addList, renameList, deleteList, updateProfile, updateSettings, resetAllData, storageError, retryStorage } = data;
+  const { profile, settings, lists, addList, renameList, deleteList, updateProfile, updateSettings, resetAllData, storageError, retryStorage, openTutorial } = data;
   const name = typeof profile.displayName === 'string' ? profile.displayName : '사용자';
   const avatar = avatars.find((item) => item === profile.avatar) ?? 'idle';
   const [panel, setPanel] = useState<'profile' | 'lists' | 'history' | 'reset' | null>(null);
@@ -72,6 +72,7 @@ export default function MyScreen() {
           <View style={styles.row}><View style={styles.grow}><Text style={styles.text}>환영 메시지</Text><Text style={styles.muted}>시작할 때 반갑게 인사해요</Text></View><Switch accessibilityLabel="환영 메시지" value={settings.welcomeMessages !== false} onValueChange={(value) => updateSettings({ welcomeMessages: value })} trackColor={{ true: '#B9DCC7' }} thumbColor={settings.welcomeMessages !== false ? Colors.light.primary : '#F4F4F4'} /></View>
         </View>
         <View style={styles.section}><Text style={styles.heading}>도움말</Text>
+          <Pressable accessibilityRole="button" style={styles.row} onPress={openTutorial}><View style={styles.grow}><Text style={styles.text}>튜토리얼 다시 보기</Text><Text style={styles.muted}>easy-do의 기본 사용법을 다시 안내해요</Text></View><Text style={styles.muted}>보기</Text></Pressable>
           <Pressable accessibilityRole="link" style={styles.row} onPress={() => { void openFeedbackForm(); }}><View style={styles.grow}><Text style={styles.text}>의견 보내기</Text><Text style={styles.muted}>불편한 점이나 개선할 점을 알려 주세요</Text></View><Text style={styles.muted}>열기 ›</Text></Pressable>
         </View>
         <View style={styles.section}><Text style={styles.heading}>데이터</Text><Pressable accessibilityRole="button" style={styles.row} onPress={() => { setResetStep(1); setResetError(null); setPanel('reset'); }}><Text style={styles.danger}>전체 데이터 삭제</Text><Text style={styles.muted}>›</Text></Pressable></View>

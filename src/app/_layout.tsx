@@ -8,6 +8,7 @@ import AppTabs from '@/components/app-tabs';
 import { Colors } from '@/constants/theme';
 import { TodoProvider, useTodoContext } from '@/contexts/todo-context';
 import { AppStartup } from '@/components/app-startup';
+import { Tutorial } from '@/components/tutorial';
 
 // React가 첫 화면을 배치하기 전 네이티브 시작 화면이 먼저 사라져 빈 화면이 보이지 않도록 합니다.
 void SplashScreen.preventAutoHideAsync().catch((error: unknown) => console.warn('시작 화면 유지 실패:', error));
@@ -19,7 +20,7 @@ function revealApp() {
 }
 
 function AppContent() {
-  const { hydrationState, storageError, retryStorage } = useTodoContext();
+  const { hydrationState, storageError, retryStorage, tutorialVisible, completeTutorial } = useTodoContext();
   const [minimumElapsed, setMinimumElapsed] = useState(false);
   useEffect(() => {
     // 앱 첫 진입에만 1초를 보장합니다. 복원과 동시에 기다려 느린 읽기에 1초를 더하지 않습니다.
@@ -31,7 +32,10 @@ function AppContent() {
   if (hydrationState !== 'ready' || !minimumElapsed) {
     return <AppStartup error={hydrationState === 'error' ? storageError ?? '데이터를 불러오지 못했어요.' : null} onRetry={retryStorage} />;
   }
-  return <AppTabs />;
+  return <>
+    <AppTabs />
+    {tutorialVisible && <Tutorial onComplete={completeTutorial} />}
+  </>;
 }
 
 const theme = {

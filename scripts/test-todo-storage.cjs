@@ -380,8 +380,9 @@ test('시작 화면: ready 전 탭 미생성, 오류 재시도, 첫 배치 후 �
     'react-native': { View: 'View', StyleSheet: { create: (styles) => styles } },
     '@/components/app-tabs': { __esModule: true, default: () => { tabMounts++; return null; } },
     '@/components/app-startup': { AppStartup: (props) => { startupProps = props; return null; } },
+    '@/components/tutorial': { Tutorial: () => null },
     '@/constants/theme': { Colors: { light: {} } },
-    '@/contexts/todo-context': { TodoProvider: pass, useTodoContext: () => ({ hydrationState: state, storageError: state === 'error' ? '읽기 실패' : null, retryStorage: () => retryCount++ }) },
+    '@/contexts/todo-context': { TodoProvider: pass, useTodoContext: () => ({ hydrationState: state, storageError: state === 'error' ? '읽기 실패' : null, retryStorage: () => retryCount++, tutorialVisible: false, completeTutorial: () => {} }) },
   }, {
     setTimeout: (callback, delay) => { assert.equal(delay, 1000); timerCount++; timerCallback = callback; return 1; },
     clearTimeout: () => { cleared = true; },
@@ -461,6 +462,7 @@ test('로컬 프로필 최초 생성·식별자 유지·설정 및 기존 추가
   const data = core.initializeLocalData(core.emptyData(), now);
   assert.equal(data.profile.displayName, '사용자');
   assert.ok(data.profile.localProfileId); assert.equal(data.settings.welcomeMessages, true);
+  assert.equal(data.settings.tutorialCompleted, false);
   const edited = reduce(data, { type: 'profile', displayName: ' 세바 ', avatar: 'cheer' });
   assert.equal(edited.profile.displayName, '세바');
   assert.equal(edited.profile.localProfileId, data.profile.localProfileId);
@@ -470,6 +472,19 @@ test('로컬 프로필 최초 생성·식별자 유지·설정 및 기존 추가
   const restored = core.initializeLocalData(await storage.loadData(tomorrow), tomorrow);
   assert.deepEqual(plain(restored.profile), plain(changed.profile));
   assert.equal(restored.settings.welcomeMessages, false); assert.equal(restored.settings.characterReactions, false);
+});
+
+test('튜토리얼 설정: 완료 저장과 기존 Todo 데이터 보존', async () => {
+  let data = reduce(core.emptyData(), { type: 'add', title: '보존할 할 일' });
+  data = core.initializeLocalData(data, now);
+  const completed = reduce(data, { type: 'settings', changes: { tutorialCompleted: true } });
+  assert.equal(completed.settings.tutorialCompleted, true);
+  assert.deepEqual(plain(completed.todos), plain(data.todos));
+  assert.equal(completed.nextId, data.nextId);
+  const { storage } = fixture(); await storage.saveData(completed);
+  const restored = core.initializeLocalData(await storage.loadData(tomorrow), tomorrow);
+  assert.equal(restored.settings.tutorialCompleted, true);
+  assert.deepEqual(plain(restored.todos), plain(data.todos));
 });
 
 test('전체 삭제: 진행 중 쓰기 뒤 실행·옛 키 제거·다른 앱 키 보존·실패 복구', async () => {

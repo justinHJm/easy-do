@@ -18,6 +18,7 @@ export function initializeLocalData(data: TodoData, now: string): TodoData {
   }, settings: { ...data.settings,
     characterReactions: typeof data.settings.characterReactions === 'boolean' ? data.settings.characterReactions : true,
     welcomeMessages: typeof data.settings.welcomeMessages === 'boolean' ? data.settings.welcomeMessages : true,
+    tutorialCompleted: typeof data.settings.tutorialCompleted === 'boolean' ? data.settings.tutorialCompleted : false,
   } };
 }
 
@@ -115,7 +116,7 @@ export function getTodoSummary<T extends Todo>(todos: readonly T[]) {
 
 export type DataAction =
   | { type: 'profile'; displayName: string; avatar: string }
-  | { type: 'settings'; changes: { characterReactions?: boolean; welcomeMessages?: boolean } }
+  | { type: 'settings'; changes: { characterReactions?: boolean; welcomeMessages?: boolean; tutorialCompleted?: boolean } }
   | { type: 'add'; title: string; priority?: Todo['priority']; listId?: number }
   | { type: 'edit'; id: number; changes: TodoEdits }
   | { type: 'delete' | 'toggle'; id: number; occurrenceDate?: string }

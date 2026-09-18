@@ -35,7 +35,7 @@ export type RoutineCompletion = {
 // 기존 저장 객체의 추가 필드도 보존하면서 화면에서 사용하는 프로필 항목을 명확히 정의합니다.
 export type LocalValue = string | number | boolean | null | LocalValue[] | { [key: string]: LocalValue };
 export type LocalProfile = { [key: string]: LocalValue };
-export type UserSettings = { [key: string]: LocalValue };
+export type UserSettings = { tutorialCompleted?: boolean; [key: string]: LocalValue | undefined };
 export type UserProfile = LocalProfile & { localProfileId: string; displayName: string; avatar: string; createdAt: string };
 export type HydrationState = 'loading' | 'ready' | 'error';
 

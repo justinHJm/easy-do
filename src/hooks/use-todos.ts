@@ -23,6 +23,7 @@ export function useTodos() {
   // hydration(저장 데이터를 메모리 상태로 복원)은 성공·실패를 구분해 무한 로딩을 막습니다.
   const [hydrationState, setHydrationState] = useState<HydrationState>('loading');
   const loaded = hydrationState === 'ready';
+  const [tutorialVisible, setTutorialVisible] = useState(false);
   const [storageError, setStorageError] = useState<string | null>(null);
   const [reload, setReload] = useState(0);
   // 비동기 읽기 직전에 들어온 입력도 사라지지 않게 작업 자체를 대기시켰다가 복원 결과에 적용합니다.
@@ -112,6 +113,11 @@ export function useTodos() {
     return () => { clearInterval(timer); subscription.remove(); };
   }, [send]);
 
+  useEffect(() => {
+    // 저장소 복원이 끝난 뒤에만 첫 안내를 열어 빈 기본 상태가 잠깐 보이는 일을 막습니다.
+    if (hydrationState === 'ready' && data.settings.tutorialCompleted !== true) setTutorialVisible(true);
+  }, [data.settings.tutorialCompleted, hydrationState]);
+
   function retryStorage() {
     if (resetting.current) return;
     if (ready.current) persist(current.current);
@@ -142,10 +148,12 @@ export function useTodos() {
   }
 
   return {
-    ...data, today, loaded, hydrationState, storageError, retryStorage,
+    ...data, today, loaded, hydrationState, storageError, retryStorage, tutorialVisible,
     resetAllData,
     updateProfile: (displayName: string, avatar: string) => send({ type: 'profile', displayName, avatar }),
-    updateSettings: (changes: { characterReactions?: boolean; welcomeMessages?: boolean }) => send({ type: 'settings', changes }),
+    updateSettings: (changes: { characterReactions?: boolean; welcomeMessages?: boolean; tutorialCompleted?: boolean }) => send({ type: 'settings', changes }),
+    openTutorial: () => setTutorialVisible(true),
+    completeTutorial: () => { setTutorialVisible(false); send({ type: 'settings', changes: { tutorialCompleted: true } }); },
     addTodo: (title: string, priority: TodoPriority = 'none', listId?: number) => send({ type: 'add', title, priority, listId }),
     editTodo: (id: number, changes: TodoEdits) => send({ type: 'edit', id, changes }),
     deleteTodo: (id: number) => send({ type: 'delete', id }),
