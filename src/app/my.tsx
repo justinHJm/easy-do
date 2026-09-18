@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors } from '@/constants/theme';
 import { characterImages } from '@/constants/character';
 import { ListManager } from '@/components/todo-views';
+import { PRIVACY_POLICY_EFFECTIVE_DATE, PRIVACY_POLICY_INTRO, PRIVACY_POLICY_SECTIONS, PRIVACY_POLICY_TITLE, PRIVACY_POLICY_WEB_URL } from '@/constants/privacy-policy';
 import { useTodoContext } from '@/contexts/todo-context';
 import { getCompletionRecords } from '@/utils/todo-statistics';
 import { prioritySymbols } from '@/utils/todo-state';
@@ -21,7 +22,7 @@ export default function MyScreen() {
   const { profile, settings, lists, addList, renameList, deleteList, updateProfile, updateSettings, resetAllData, storageError, retryStorage, openTutorial } = data;
   const name = typeof profile.displayName === 'string' ? profile.displayName : '사용자';
   const avatar = avatars.find((item) => item === profile.avatar) ?? 'idle';
-  const [panel, setPanel] = useState<'profile' | 'lists' | 'history' | 'reset' | null>(null);
+  const [panel, setPanel] = useState<'profile' | 'lists' | 'history' | 'privacy' | 'reset' | null>(null);
   // 편집 초안을 분리해서 취소했을 때 공유 프로필이 바뀌지 않게 합니다.
   const [draftName, setDraftName] = useState('');
   const [draftAvatar, setDraftAvatar] = useState<Avatar>('idle');
@@ -50,6 +51,14 @@ export default function MyScreen() {
       setNotice('의견 보내기 화면을 열지 못했어요. 다시 시도해 주세요.');
     }
   }
+  async function openPrivacyPolicyWeb() {
+    if (!PRIVACY_POLICY_WEB_URL) return;
+    try {
+      await Linking.openURL(PRIVACY_POLICY_WEB_URL);
+    } catch {
+      setNotice('개인정보처리방침 웹페이지를 열지 못했어요. 다시 시도해 주세요.');
+    }
+  }
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
       <ScrollView contentContainerStyle={styles.content}>
@@ -71,6 +80,7 @@ export default function MyScreen() {
         </View>
         <View style={styles.section}><Text style={styles.heading}>도움말</Text>
           <Pressable accessibilityRole="button" style={styles.row} onPress={openTutorial}><View style={styles.grow}><Text style={styles.text}>튜토리얼 다시 보기</Text><Text style={styles.muted}>easy-do의 기본 사용법을 다시 안내해요</Text></View><Text style={styles.muted}>보기</Text></Pressable>
+          <Pressable accessibilityRole="button" style={styles.row} onPress={() => setPanel('privacy')}><View style={styles.grow}><Text style={styles.text}>개인정보처리방침</Text><Text style={styles.muted}>앱에서 처리하는 정보와 저장 방식을 확인해요</Text></View><Text style={styles.muted}>보기</Text></Pressable>
           <Pressable accessibilityRole="link" style={styles.row} onPress={() => { void openFeedbackForm(); }}><View style={styles.grow}><Text style={styles.text}>의견 보내기</Text><Text style={styles.muted}>불편한 점이나 개선할 점을 알려 주세요</Text></View><Text style={styles.muted}>열기 ›</Text></Pressable>
         </View>
         <View style={styles.section}><Text style={styles.heading}>데이터</Text><Pressable accessibilityRole="button" style={styles.row} onPress={() => { setResetStep(1); setResetError(null); setPanel('reset'); }}><Text style={styles.danger}>전체 데이터 삭제</Text><Text style={styles.muted}>›</Text></Pressable></View>
@@ -80,7 +90,7 @@ export default function MyScreen() {
       {panel !== null && panel !== 'lists' && <Modal transparent animationType="fade" onRequestClose={closePanel}>
         <KeyboardAvoidingView style={styles.overlay} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
           <SafeAreaView style={styles.modal} accessibilityViewIsModal>
-            <View style={styles.row}><Text style={styles.heading}>{panel === 'profile' ? '프로필 편집' : panel === 'history' ? '완료 기록' : '전체 데이터 삭제'}</Text><Pressable accessibilityRole="button" disabled={resetting} style={styles.button} onPress={closePanel}><Text style={styles.green}>닫기</Text></Pressable></View>
+            <View style={styles.row}><Text style={styles.heading}>{panel === 'profile' ? '프로필 편집' : panel === 'history' ? '완료 기록' : panel === 'privacy' ? PRIVACY_POLICY_TITLE : '전체 데이터 삭제'}</Text><Pressable accessibilityRole="button" disabled={resetting} style={styles.button} onPress={closePanel}><Text style={styles.green}>닫기</Text></Pressable></View>
             <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.form}>
               {panel === 'profile' && <>
                 <Text style={styles.text}>닉네임</Text><TextInput style={styles.input} accessibilityLabel="닉네임" value={draftName} onChangeText={setDraftName} maxLength={30} placeholder="닉네임을 입력해 주세요" /><Text style={styles.muted}>최대 30자</Text>
@@ -88,6 +98,16 @@ export default function MyScreen() {
                 <Pressable accessibilityRole="button" disabled={!draftName.trim()} style={[styles.primaryButton, !draftName.trim() && styles.disabled]} onPress={() => { updateProfile(draftName.trim(), draftAvatar); setPanel(null); }}><Text style={styles.primaryText}>저장</Text></Pressable>
               </>}
               {panel === 'history' && <><Text style={styles.muted}>최근 완료한 순서예요.</Text>{records.length === 0 ? <Text style={styles.empty}>아직 완료 기록이 없어요.</Text> : records.map((record) => <View key={record.key} style={styles.record}><Text style={styles.text}>{record.title}</Text><Text style={styles.muted}>{record.kind === 'routine' ? '루틴' : '할 일'} · 우선순위 {prioritySymbols[record.priority] ? `${prioritySymbols[record.priority]} ` : ''}{priorityLabels[record.priority]}</Text><Text style={styles.muted}>{new Date(record.completedAt).toLocaleString('ko-KR')}</Text></View>)}</>}
+              {panel === 'privacy' && <>
+                <Text style={styles.policyDate}>시행일: {PRIVACY_POLICY_EFFECTIVE_DATE}</Text>
+                <Text style={styles.text}>{PRIVACY_POLICY_INTRO}</Text>
+                {PRIVACY_POLICY_SECTIONS.map((section) => <View key={section.title} style={styles.policySection}>
+                  <Text style={styles.heading}>{section.title}</Text>
+                  {section.paragraphs.map((paragraph) => <Text key={paragraph} style={styles.text}>{paragraph}</Text>)}
+                  {section.items?.map((item) => <Text key={item} style={styles.policyItem}>• {item}</Text>)}
+                </View>)}
+                {PRIVACY_POLICY_WEB_URL && <Pressable accessibilityRole="link" style={styles.button} onPress={() => { void openPrivacyPolicyWeb(); }}><Text style={styles.green}>웹에서 보기</Text></Pressable>}
+              </>}
               {panel === 'reset' && <>
                 <Text style={styles.heading}>{resetStep === 1 ? '삭제할 데이터를 확인해 주세요' : '정말 모두 삭제할까요?'}</Text><Text style={styles.text}>할 일, 리스트, 완료 기록, 루틴 완료 기록, 프로필, 설정이 모두 삭제돼요.</Text><Text style={styles.danger}>삭제한 데이터는 되돌릴 수 없어요.</Text>
                 {resetError && <Text accessibilityLiveRegion="assertive" style={styles.danger}>{resetError}</Text>}
@@ -127,5 +147,8 @@ const styles = StyleSheet.create({
   primaryButton: { backgroundColor: Colors.light.primary, borderRadius: 12, minHeight: 48, justifyContent: 'center', alignItems: 'center', padding: 12 },
   dangerButton: { backgroundColor: '#B52F3B' }, primaryText: { color: '#FFFFFF', fontWeight: '700', textAlign: 'center' }, disabled: { opacity: 0.45 },
   record: { gap: 5, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#E9EEE9' },
+  policyDate: { color: Colors.light.textSecondary, fontSize: 13 },
+  policySection: { gap: 8, paddingTop: 10 },
+  policyItem: { color: Colors.light.text, fontSize: 15, paddingLeft: 4 },
   empty: { color: Colors.light.textSecondary, textAlign: 'center', paddingVertical: 28 },
 });

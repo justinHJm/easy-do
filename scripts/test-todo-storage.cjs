@@ -279,7 +279,11 @@ function harness(storage) {
   };
   class Clock extends Date { constructor(...args) { super(...(args.length ? args : [clock])); } }
   const { useTodos } = load('src/hooks/use-todos.ts', { react,
-    'react-native': { AppState: { addEventListener: (_, fn) => { foreground = fn; return { remove() {} }; } } },
+    'react-native': {
+      AppState: { addEventListener: (_, fn) => { foreground = fn; return { remove() {} }; } },
+      Platform: { OS: 'ios' },
+      NativeModules: {},
+    },
     '@/storage/todo-storage': storage, '@/utils/todo-state': core, '@/utils/due-date': dates,
   }, { Date: Clock, setInterval: (fn) => { interval = fn; return 1; }, clearInterval() {},
     setTimeout: (fn) => { const id = ++nextTimeout; timeouts.set(id, fn); return id; }, clearTimeout: (id) => timeouts.delete(id) });
