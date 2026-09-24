@@ -1,0 +1,16 @@
+{
+  "name": "easy-do Codespace",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:1-22-bookworm",
+  "hostRequirements": {
+    "cpus": 2
+  },
+  "postCreateCommand": "npm ci && npm install -g @openai/codex@0.153.4",
+  "postStartCommand": "git status --short --branch",
+  "forwardPorts": [8081],
+  "portsAttributes": {
+    "8081": {
+      "label": "Expo Metro",
+      "onAutoForward": "notify"
+    }
+  }
+}
