@@ -35,6 +35,7 @@ export function useTodos() {
   const writeVersion = useRef(0);
   const mounted = useRef(false);
   const resetting = useRef(false);
+  const syncing = useRef(false);
 
   useEffect(() => {
     mounted.current = true;
@@ -107,13 +108,54 @@ export function useTodos() {
     }
   }, [persist]);
 
+  const syncFromStorage = useCallback(async () => {
+    if (!ready.current || resetting.current || syncing.current) return;
+    syncing.current = true;
+    const version = writeVersion.current;
+    const now = new Date().toISOString();
+    try {
+      const stored = await loadData(now);
+      // 읽는 중 앱 입력이 생기면 이전 저장본으로 화면을 되돌리지 않습니다.
+      if (!mounted.current || resetting.current || version !== writeVersion.current) return;
+      const next = rollover(initializeLocalData(stored, now), dateKey(new Date(now)));
+      current.current = next;
+      setData(next);
+      setToday(dateKey(new Date(now)));
+      setStorageError(null);
+    } catch {
+      // 복귀 동기화 실패는 현재 메모리 상태를 보존하고 다음 복귀 때 다시 시도합니다.
+    } finally {
+      syncing.current = false;
+    }
+  }, []);
+
   useEffect(() => {
-    const refresh = () => { setToday(dateKey(new Date())); send({ type: 'day' }); };
-    // 자정에는 가벼운 타이머, 백그라운드에서 돌아올 때는 AppState로 날짜를 다시 확인합니다.
-    const timer = setInterval(refresh, 30000);
-    const subscription = AppState.addEventListener('change', (state) => { if (state === 'active') refresh(); });
-    return () => { clearInterval(timer); subscription.remove(); };
-  }, [send]);
+    // 위젯 작업은 별도 JS 실행 환경에서 저장하므로 복귀 시에만 저장본을 다시 읽습니다.
+    const subscription = AppState.addEventListener('change', (state) => { if (state === 'active') void syncFromStorage(); });
+    return () => subscription.remove();
+  }, [syncFromStorage]);
+
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    function scheduleNextMidnight() {
+      const now = new Date();
+      const nextMidnight = new Date(now);
+      nextMidnight.setHours(24, 0, 0, 0);
+      // 30초 polling 대신 다음 날짜 경계에서만 목록과 통계를 한 번 갱신합니다.
+      timer = setTimeout(() => {
+        const changedAt = new Date();
+        const next = rollover(current.current, dateKey(changedAt));
+        const changed = next !== current.current;
+        current.current = next;
+        setData(next);
+        setToday(dateKey(changedAt));
+        if (changed) persist(next, true);
+        scheduleNextMidnight();
+      }, Math.max(1000, nextMidnight.getTime() - now.getTime()));
+    }
+    scheduleNextMidnight();
+    return () => { if (timer) clearTimeout(timer); };
+  }, [persist]);
 
   useEffect(() => {
     // 저장소 복원이 끝난 뒤에만 첫 안내를 열어 빈 기본 상태가 잠깐 보이는 일을 막습니다.

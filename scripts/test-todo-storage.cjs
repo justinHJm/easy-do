@@ -188,6 +188,24 @@ test('매주·미래 시작·매월 말일·윤년·연도 경계', () => {
   assert.equal(core.validRecurrence({ ...weekly, weekdays: [7] }), false);
 });
 
+test('루틴 종료일: 종료 당일까지 표시·통계 예정 회차 제한·기존 종료일 없는 데이터 호환', () => {
+  const daily = { type: 'daily', startDate: '2026-09-07', endDate: '2026-09-09' };
+  assert.equal(core.validRecurrence(daily), true);
+  assert.equal(core.validRecurrence({ ...daily, endDate: '2026-09-06' }), false);
+  assert.equal(core.nextOccurrence(daily, '2026-09-09'), '2026-09-09');
+  assert.equal(core.nextOccurrence(daily, '2026-09-10'), undefined);
+  assert.equal(core.nextOccurrence({ type: 'weekly', weekdays: [1], startDate: '2026-09-07', endDate: '2026-09-08' }, '2026-09-08'), undefined);
+
+  const data = { ...core.emptyData(), todos: [{ id: 1, title: '종료 루틴', priority: 'none', completed: false, recurrence: daily }] };
+  assert.equal(core.visibleTodos(data, 'routine', '2026-09-09').length, 1);
+  assert.equal(core.visibleTodos(data, 'routine', '2026-09-10').length, 0);
+  assert.equal(stats.getStatistics(data, '2026-09-07').routines.scheduled, 3);
+
+  const legacy = { type: 'daily', startDate: '2026-09-07' };
+  assert.equal(core.validRecurrence(legacy), true);
+  assert.equal(core.nextOccurrence(legacy, '2026-09-20'), '2026-09-20');
+});
+
 test('달력 빈 칸·날짜 검증·현지 날짜·서머타임 경계', () => {
   assert.equal(dates.isDueDate('2028-02-29'), true); assert.equal(dates.isDueDate('2026-02-29'), false);
   assert.equal(dates.isDueDate('2026-04-31'), false);
@@ -268,7 +286,7 @@ test('느린 저장 순서·실패 복구·손상 데이터 원본 보존', asyn
 
 // 최소 Hook 실행기로 초기 복원·저장·날짜 이벤트 연결을 검사합니다. React 화면 렌더러를 대체하지는 않습니다.
 function harness(storage) {
-  const slots = []; let cursor = 0; let effects = []; let clock = now; let foreground; let interval;
+  const slots = []; let cursor = 0; let effects = []; let clock = now; let foreground;
   const timeouts = new Map(); let nextTimeout = 0;
   const changed = (a, b) => !a || a.length !== b.length || a.some((x, i) => !Object.is(x, b[i]));
   const react = {
@@ -285,28 +303,34 @@ function harness(storage) {
       NativeModules: {},
     },
     '@/storage/todo-storage': storage, '@/utils/todo-state': core, '@/utils/due-date': dates,
-  }, { Date: Clock, setInterval: (fn) => { interval = fn; return 1; }, clearInterval() {},
+  }, { Date: Clock,
     setTimeout: (fn) => { const id = ++nextTimeout; timeouts.set(id, fn); return id; }, clearTimeout: (id) => timeouts.delete(id) });
   return {
     render() { cursor = 0; const result = useTodos(); const pending = effects; effects = []; pending.forEach((effect) => effect()); return result; },
-    day(time, event = 'foreground') { clock = time; if (event === 'foreground') foreground('active'); else interval(); },
+    foreground(time) { clock = time; foreground('active'); },
+    dayBoundary(time) { clock = time; const pending = [...timeouts.values()]; timeouts.clear(); pending.forEach((fn) => fn()); },
     timeout() { const pending = [...timeouts.values()]; timeouts.clear(); pending.forEach((fn) => fn()); },
     unmount() { slots.forEach((slot) => slot?.cleanup?.()); },
   };
 }
 
-test('Hook: 초기 쓰기 금지·대기 입력 복원·foreground/타이머 날짜 처리', async () => {
-  let release; const writes = [];
-  const stored = reduce(core.emptyData(), { type: 'add', title: '기존' });
-  const h = harness({ loadData: () => new Promise((resolve) => { release = resolve; }), saveData: async (data) => { writes.push(plain(data)); } });
+test('Hook: 초기 쓰기 금지·대기 입력 복원·foreground 저장본 동기화', async () => {
+  let release; let loading = true; const writes = [];
+  let stored = reduce(core.emptyData(), { type: 'add', title: '기존' });
+  const h = harness({ loadData: () => loading ? new Promise((resolve) => { release = resolve; }) : Promise.resolve(stored), saveData: async (data) => { stored = plain(data); writes.push(stored); } });
   let hook = h.render(); assert.equal(hook.loaded, false); assert.equal(hook.hydrationState, 'loading');
   hook.addTodo('읽는 동안 추가'); assert.equal(writes.length, 0);
-  release(stored); await tick(); hook = h.render();
+  loading = false; release(stored); await tick(); hook = h.render();
   assert.equal(hook.loaded, true); assert.equal(hook.hydrationState, 'ready'); assert.equal(ids(hook.todos), '1,2');
-  hook.toggleTodo(1); h.day(tomorrow); hook = h.render();
-  assert.equal(hook.today, '2026-09-08'); assert.equal(hook.history.length, 1); assert.equal(hook.todos.length, 1);
-  assert.equal(writes.at(-1).history.length, 1);
-  h.day(new Date(2026, 8, 9).toISOString(), 'timer'); assert.equal(h.render().today, '2026-09-09'); h.unmount();
+  // 앱을 계속 연 상태에서도 다음 자정에만 날짜를 갱신하며 30초 polling은 사용하지 않습니다.
+  h.dayBoundary(tomorrow); hook = h.render(); assert.equal(hook.today, '2026-09-08');
+  // 위젯의 별도 JS 작업이 저장한 완료 상태를 앱 복귀 때 다시 읽습니다.
+  stored = reduce(stored, { type: 'toggle', id: 1 }, tomorrow);
+  h.foreground(tomorrow); await tick(); await tick(); hook = h.render();
+  assert.equal(hook.today, '2026-09-08'); assert.equal(hook.todos.find((todo) => todo.id === 1)?.completed, true);
+  stored = reduce(stored, { type: 'toggle', id: 2 }, new Date(2026, 8, 9).toISOString());
+  h.foreground(new Date(2026, 8, 9).toISOString()); await tick();
+  hook = h.render(); assert.equal(hook.today, '2026-09-09'); assert.equal(hook.todos.find((todo) => todo.id === 2)?.completed, true); h.unmount();
 });
 
 test('Hook: 읽기·쓰기 실패 표시 및 재시도, 빈 상태 덮어쓰기 방지', async () => {
@@ -640,6 +664,24 @@ test('Widget refresh feedback reloads without saving', async () => {
   });
   assert.equal(renders.length, 2); assert.equal(renders[0].refreshing, true); assert.equal(renders[1].refreshing, false);
   assert.equal(saveCalls, 0);
+});
+
+test('Widget 완료는 저장 뒤 모든 Todo 위젯을 갱신', async () => {
+  let registered; let updateCalls = 0;
+  const data = { ...core.emptyData(), todos: [{ id: 1, title: 'today', priority: 'none', completed: false, dueDate: '2026-09-07' }] };
+  const handler = load('src/widgets/todo-widget-handler.ts', {
+    'react-native-android-widget': { registerWidgetTaskHandler(callback) { registered = callback; } },
+    '@/storage/todo-storage': { loadDataWithDiagnostics: async () => ({ data, rawExists: true, key: newKey }), saveData: async () => {} },
+    '@/utils/due-date': dates, '@/utils/todo-state': core,
+    '@/widgets/todo-widget': { renderTodoWidget: (renderData, today, mode) => ({ renderData, today, mode }) },
+    '@/widgets/request-todo-widget-update': { requestTodoWidgetUpdate: async () => { updateCalls++; } },
+  }, { __DEV__: false });
+  handler.registerTodoWidgetHandler();
+  await registered({
+    widgetInfo: { widgetName: handler.TODO_WIDGET_NAME }, widgetAction: 'WIDGET_CLICK', clickAction: 'TOGGLE_TODO', clickActionData: { id: 1 },
+    renderWidget() {},
+  });
+  assert.equal(updateCalls, 1);
 });
 
 (async () => {

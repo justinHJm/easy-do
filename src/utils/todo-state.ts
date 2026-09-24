@@ -32,18 +32,21 @@ export function validRecurrence(value: unknown): value is Recurrence {
   if (!value || typeof value !== 'object') return false;
   const r = value as Record<string, unknown>;
   if (!isDueDate(r.startDate)) return false;
+  if (r.endDate !== undefined && (!isDueDate(r.endDate) || r.endDate < r.startDate)) return false;
   return r.type === 'daily' || (r.type === 'weekly' && Array.isArray(r.weekdays) && r.weekdays.length > 0 &&
     r.weekdays.every((d) => Number.isInteger(d) && d >= 0 && d <= 6)) ||
     (r.type === 'monthly' && typeof r.day === 'number' && Number.isInteger(r.day) && r.day >= 1 && r.day <= 31);
 }
 
 // 원본을 복제해서 쌓지 않고, 오늘 또는 다음 예정 회차 날짜를 계산합니다. 놓친 회차를 무한 생성하지 않습니다.
-export function nextOccurrence(rule: Recurrence, today: string): string {
+export function nextOccurrence(rule: Recurrence, today: string): string | undefined {
   const from = today > rule.startDate ? today : rule.startDate;
+  if (rule.endDate && from > rule.endDate) return undefined;
   if (rule.type === 'daily') return from;
   if (rule.type === 'weekly') {
     for (let i = 0; i < 7; i++) {
       const day = addDays(from, i);
+      if (rule.endDate && day > rule.endDate) return undefined;
       if (rule.weekdays.includes(localDate(day).getDay())) return day;
     }
   }
@@ -55,16 +58,17 @@ export function nextOccurrence(rule: Recurrence, today: string): string {
       // 31일이 없는 달은 말일로 실행하되 규칙의 31은 유지해 다음 달에 다시 31일을 사용합니다.
       const day = Math.min(rule.day, new Date(year, month + 1, 0).getDate());
       const candidate = dateKey(new Date(year, month, day));
+      if (rule.endDate && candidate > rule.endDate) return undefined;
       if (candidate >= from) return candidate;
     }
   }
-  return from;
+  return rule.endDate && from > rule.endDate ? undefined : from;
 }
 
 export function recurrenceLabel(rule: Recurrence): string {
-  if (rule.type === 'daily') return '매일';
-  if (rule.type === 'monthly') return `매월 ${rule.day}일`;
-  return `매주 ${[...rule.weekdays].sort().map((d) => '일월화수목금토'[d]).join('·')}`;
+  const label = rule.type === 'daily' ? '매일' : rule.type === 'monthly' ? `매월 ${rule.day}일` :
+    `매주 ${[...rule.weekdays].sort().map((d) => '일월화수목금토'[d]).join('·')}`;
+  return rule.endDate ? `${label} · ${rule.endDate}까지` : label;
 }
 
 // 정리는 같은 날 여러 번 호출해도 중복 기록을 만들지 않습니다. 원본 제거와 History 추가는 한 상태 변경입니다.
@@ -82,9 +86,10 @@ export function rollover(data: TodoData, today: string): TodoData {
 }
 
 export function visibleTodos(data: TodoData, view: TodoView, today: string): VisibleTodo[] {
-  const rows: VisibleTodo[] = rollover(data, today).todos.map((todo) => {
+  const rows: VisibleTodo[] = rollover(data, today).todos.flatMap((todo) => {
     if (!todo.recurrence) return todo;
     const occurrenceDate = nextOccurrence(todo.recurrence, today);
+    if (!occurrenceDate) return [];
     const done = data.completions.find((c) => c.todoId === todo.id && c.occurrenceDate === occurrenceDate);
     return { ...todo, occurrenceDate, dueDate: occurrenceDate, completed: !!done, completedAt: done?.completedAt };
   });
@@ -148,6 +153,7 @@ export function updateData(original: TodoData, action: DataAction, now: string):
       if (!changes.title.trim() || (changes.dueDate !== undefined && !isDueDate(changes.dueDate)) ||
         (changes.recurrence !== undefined && !validRecurrence(changes.recurrence))) return data;
       let completions = data.completions;
+      let history = data.history;
       const todos = data.todos.map((todo) => {
         if (todo.id !== action.id) return todo;
         let completed = todo.completed;
@@ -156,13 +162,15 @@ export function updateData(original: TodoData, action: DataAction, now: string):
         if (!todo.recurrence && changes.recurrence) {
           const occurrenceDate = nextOccurrence(changes.recurrence, today);
           completions = completions.filter((c) => !(c.todoId === todo.id && c.occurrenceDate === occurrenceDate));
-          if (todo.completed) completions = [...completions, { todoId: todo.id, occurrenceDate,
+          if (todo.completed && occurrenceDate) completions = [...completions, { todoId: todo.id, occurrenceDate,
             completedAt: todo.completedAt ?? now, snapshot: { ...todo } }];
+          // 과거에 종료된 루틴으로 바꾸더라도 기존 일반 Todo 완료 기록을 버리지 않습니다.
+          if (todo.completed && !occurrenceDate && todo.completedAt) history = [...history, { ...todo, completedAt: todo.completedAt }];
           completed = false;
           completedAt = undefined;
         } else if (todo.recurrence && !changes.recurrence) {
           const occurrenceDate = nextOccurrence(todo.recurrence, today);
-          const done = completions.find((c) => c.todoId === todo.id && c.occurrenceDate === occurrenceDate);
+          const done = occurrenceDate ? completions.find((c) => c.todoId === todo.id && c.occurrenceDate === occurrenceDate) : undefined;
           completed = !!done;
           completedAt = done?.completedAt;
           completions = completions.filter((c) => !(c.todoId === todo.id && c.occurrenceDate === occurrenceDate));
@@ -170,7 +178,7 @@ export function updateData(original: TodoData, action: DataAction, now: string):
         return { ...todo, ...changes, title: changes.title.trim(), listId: validList(changes.listId),
           completed, completedAt };
       });
-      return { ...data, todos, completions };
+      return { ...data, todos, completions, history };
     }
     case 'delete': {
       const todo = data.todos.find((t) => t.id === action.id);
@@ -184,6 +192,7 @@ export function updateData(original: TodoData, action: DataAction, now: string):
       if (!todo) return data;
       if (todo.recurrence) {
         const occurrenceDate = nextOccurrence(todo.recurrence, today);
+        if (!occurrenceDate) return data;
         // 자정 직전 보던 체크박스를 뒤늦게 눌러 새 회차를 잘못 완료하지 않도록 날짜도 확인합니다.
         if (action.occurrenceDate && action.occurrenceDate !== occurrenceDate) return data;
         const exists = data.completions.some((c) => c.todoId === todo.id && c.occurrenceDate === occurrenceDate);

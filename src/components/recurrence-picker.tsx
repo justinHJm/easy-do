@@ -10,9 +10,9 @@ export function RecurrencePicker({ value, startDate, onChange }: {
   // 반복 기준일과 규칙을 함께 보관해 미래 시작일도 표현합니다. 월말 보정은 표시할 회차 계산에서만 합니다.
   function choose(type: typeof options[number][0]) {
     if (type === 'none') onChange(undefined);
-    else if (type === 'weekly') onChange({ type, startDate, weekdays: [localDate(startDate).getDay()] });
-    else if (type === 'monthly') onChange({ type, startDate, day: localDate(startDate).getDate() });
-    else onChange({ type, startDate });
+    else if (type === 'weekly') onChange({ type, startDate, ...(value?.endDate ? { endDate: value.endDate } : {}), weekdays: [localDate(startDate).getDay()] });
+    else if (type === 'monthly') onChange({ type, startDate, ...(value?.endDate ? { endDate: value.endDate } : {}), day: localDate(startDate).getDate() });
+    else onChange({ type, startDate, ...(value?.endDate ? { endDate: value.endDate } : {}) });
   }
   return <View style={styles.form}>
     <View style={styles.wrap}>{options.map(([type, label]) => <Pressable key={type} accessibilityRole="radio"

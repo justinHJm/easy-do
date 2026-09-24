@@ -2,7 +2,7 @@
   "expo": {
     "name": "easy-do",
     "slug": "easy-do",
-    "version": "0.3.0",
+    "version": "0.3.1",
     "orientation": "portrait",
     "icon": "./assets/characters/easydo-base.png",
     "scheme": "easydo",

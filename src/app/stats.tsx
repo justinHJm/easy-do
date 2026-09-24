@@ -58,29 +58,29 @@ export default function StatsScreen() {
           </View>
           </>}
           <View style={styles.card}>
-            <Text style={styles.heading}>Todo</Text>
-            <Text style={styles.note}>반복하지 않는 할 일 기준이에요.</Text>
-            {stats.todos.totalCompleted === 0 && stats.todos.pending === 0 ?
-              <Text style={styles.note}>아직 Todo가 없어요. 홈에서 할 일을 추가해 보세요.</Text> : <>
-              <View style={styles.row}><Text style={styles.value}>오늘 완료</Text><Text style={styles.green}>{stats.todos.todayCompleted}개</Text></View>
-              <View style={styles.row}><Text style={styles.value}>이번 주 완료</Text><Text style={styles.green}>{stats.todos.weekCompleted}개</Text></View>
-              <View style={styles.row}><Text style={styles.value}>누적 완료</Text><Text style={styles.value}>{stats.todos.totalCompleted}개</Text></View>
-              <View style={styles.row}><Text style={styles.value}>남은 할 일</Text><Text style={styles.value}>{stats.todos.pending}개</Text></View>
-              <View style={styles.row}><Text style={styles.value}>기한 지난 할 일</Text><Text style={styles.value}>{stats.todos.overdue}개</Text></View>
-              <Text style={styles.note}>기한 지난 할 일은 남은 할 일에 포함돼요.</Text>
-            </>}
-          </View>
-          <View style={styles.card}>
             <Text style={styles.heading}>이번 주 루틴</Text>
             {!data.todos.some((todo) => todo.recurrence) && stats.routines.completed === 0 ?
               <Text style={styles.note}>아직 루틴이 없어요. 홈에서 반복할 일을 만들어 보세요.</Text> : <>
             <Text style={styles.note}>이번 주 예정 회차 기준</Text>
             <View style={styles.row}><Text style={styles.value}>완료 {stats.routines.completed} / 예정 {stats.routines.scheduled}회</Text>
               <Text style={styles.rate}>{stats.routines.rate}%</Text></View>
-            <View style={styles.track} accessible accessibilityLabel={`이번 주 루틴 달성률 ${stats.routines.rate}%`}>
-              <View style={[styles.fill, { width: `${stats.routines.rate}%` }]} />
+            <View style={styles.dots} accessible accessibilityLabel={`이번 주 루틴 ${stats.routines.completed}회 완료, ${stats.routines.scheduled}회 예정`}>
+              {Array.from({ length: stats.routines.scheduled }, (_, index) => <View key={index} style={[styles.dot, index < stats.routines.completed && styles.dotCompleted]} />)}
             </View>
             <Text style={styles.note}>예정 횟수는 현재 반복 규칙을 기준으로 추정해요. 삭제하거나 규칙을 바꾼 루틴도 완료한 회차는 포함해요.</Text>
+            </>}
+          </View>
+          <View style={styles.card}>
+            <Text style={styles.heading}>Todo</Text>
+            <Text style={styles.note}>반복하지 않는 할 일 기준이에요.</Text>
+            {stats.todos.totalCompleted === 0 && stats.todos.pending === 0 ?
+              <Text style={styles.note}>아직 Todo가 없어요. 홈에서 할 일을 추가해 보세요.</Text> : <>
+              <View style={[styles.row, styles.primaryRow]}><Text style={styles.value}>오늘 완료</Text><Text style={styles.primaryValue}>{stats.todos.todayCompleted}개</Text></View>
+              <View style={styles.row}><Text style={styles.value}>이번 주 완료</Text><Text style={styles.green}>{stats.todos.weekCompleted}개</Text></View>
+              <View style={styles.row}><Text style={styles.value}>누적 완료</Text><Text style={styles.value}>{stats.todos.totalCompleted}개</Text></View>
+              <View style={[styles.row, styles.primaryRow]}><Text style={styles.value}>남은 할 일</Text><Text style={styles.primaryValue}>{stats.todos.pending}개</Text></View>
+              <View style={styles.row}><Text style={styles.value}>기한 지난 할 일</Text><Text style={styles.value}>{stats.todos.overdue}개</Text></View>
+              <Text style={styles.note}>기한 지난 할 일은 남은 할 일에 포함돼요.</Text>
             </>}
           </View>
         </>}
@@ -94,7 +94,7 @@ const styles = StyleSheet.create({
   content: { padding: Spacing.three, paddingBottom: Spacing.four, gap: 12 },
   title: { fontSize: 22, fontWeight: '700', color: colors.text, marginBottom: 4 },
   card: { backgroundColor: colors.backgroundElement, borderRadius: 16, padding: 16, gap: 10 },
-  summary: { flexDirection: 'row', gap: 12 }, summaryCard: { flex: 1 },
+  summary: { flexDirection: 'row', gap: 12 }, summaryCard: { flex: 1, minHeight: 108, justifyContent: 'space-between' },
   heading: { fontSize: 16, fontWeight: '700', color: colors.text },
   note: { fontSize: 13, lineHeight: 20, color: colors.textSecondary },
   number: { fontSize: 30, fontWeight: '700', color: colors.primary },
@@ -107,8 +107,8 @@ const styles = StyleSheet.create({
   todayBar: { backgroundColor: colors.primary }, green: { color: colors.primary, fontWeight: '700' },
   day: { fontSize: 12, color: colors.textSecondary }, date: { fontSize: 10, color: colors.textSecondary },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
-  value: { fontSize: 14, color: colors.text }, rate: { fontSize: 24, fontWeight: '700', color: colors.primary },
-  track: { height: 8, backgroundColor: colors.backgroundSelected, borderRadius: 4, overflow: 'hidden' },
-  fill: { height: '100%', backgroundColor: colors.primary, borderRadius: 4 },
+  primaryRow: { paddingVertical: 3 }, value: { fontSize: 14, color: colors.text }, primaryValue: { fontSize: 20, fontWeight: '700', color: colors.primary }, rate: { fontSize: 24, fontWeight: '700', color: colors.primary },
+  dots: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, minHeight: 16 },
+  dot: { width: 12, height: 12, borderRadius: 6, backgroundColor: colors.backgroundSelected }, dotCompleted: { backgroundColor: colors.primary },
   empty: { gap: 8 }, retry: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' },
 });

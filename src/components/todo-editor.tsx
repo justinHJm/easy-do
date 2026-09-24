@@ -15,17 +15,21 @@ export function TodoEditor({ todo, lists, onSave, onDelete, onClose }: {
   const [title, setTitle] = useState(todo.title);
   const [priority, setPriority] = useState<TodoPriority>(todo.priority);
   const [dueDate, setDueDate] = useState(todo.recurrence?.startDate ?? todo.dueDate);
+  const [endDate, setEndDate] = useState(todo.recurrence?.endDate);
   const [listId, setListId] = useState(todo.listId);
   const [recurrence, setRecurrence] = useState<Recurrence | undefined>(todo.recurrence);
   const [page, setPage] = useState<'edit' | 'calendar' | 'delete'>('edit');
+  const [calendarTarget, setCalendarTarget] = useState<'start' | 'end'>('start');
   const [showPriority, setShowPriority] = useState(false);
   function close() { if (page === 'edit') onClose(); else setPage('edit'); }
   function save() {
     if (!title.trim()) return;
     // dueDate가 undefined이면 기한 제거를 뜻합니다. 완료 여부는 편집 대상에 포함하지 않습니다.
     // 반복의 시작일은 날짜 전용 값입니다. 사용자가 달력을 비웠으면 오늘부터 시작합니다.
+    const startDate = dueDate ?? dateKey(new Date());
+    if (recurrence && endDate && endDate < startDate) return;
     onSave(todo.id, { title: title.trim(), priority, dueDate, listId,
-      recurrence: recurrence ? { ...recurrence, startDate: dueDate ?? dateKey(new Date()) } : undefined });
+      recurrence: recurrence ? { ...recurrence, startDate, ...(endDate ? { endDate } : {}) } : undefined });
     onClose();
   }
   return (
@@ -34,8 +38,18 @@ export function TodoEditor({ todo, lists, onSave, onDelete, onClose }: {
         <Pressable style={StyleSheet.absoluteFill} accessibilityRole="button" accessibilityLabel="수정 화면 닫기" onPress={close} />
         <View style={styles.panel} accessibilityViewIsModal>
           <ScrollView keyboardShouldPersistTaps="handled">
-            {page === 'calendar' ? <TodoCalendar value={dueDate} onCancel={() => setPage('edit')}
-              onConfirm={(value) => { setDueDate(value); setPage('edit'); }} /> : page === 'delete' ? (
+            {page === 'calendar' ? <TodoCalendar value={calendarTarget === 'start' ? dueDate : endDate}
+              minimumDate={calendarTarget === 'end' ? dueDate ?? dateKey(new Date()) : undefined} onCancel={() => setPage('edit')}
+              onConfirm={(value) => {
+                if (calendarTarget === 'start') {
+                  setDueDate(value);
+                  // 시작일을 비우면 저장 시 오늘부터 시작하므로, 그보다 앞선 종료일도 함께 비웁니다.
+                  const nextStartDate = value ?? dateKey(new Date());
+                  if (endDate && endDate < nextStartDate) setEndDate(undefined);
+                }
+                else setEndDate(value);
+                setPage('edit');
+              }} /> : page === 'delete' ? (
               <View style={styles.confirm}>
                 <Text style={styles.heading}>이 Todo를 삭제할까요?</Text>
                 <Text style={styles.body}>{todo.title}</Text>
@@ -62,11 +76,17 @@ export function TodoEditor({ todo, lists, onSave, onDelete, onClose }: {
                 <Text style={styles.label}>리스트</Text>
                 <ListChoices lists={lists} value={listId} onChange={setListId} />
                 <Text style={styles.label}>{recurrence ? '반복 시작일' : '기한'}</Text>
-                <Pressable accessibilityRole="button" style={styles.field} onPress={() => { Keyboard.dismiss(); setPage('calendar'); }}>
+                <Pressable accessibilityRole="button" style={styles.field} onPress={() => { Keyboard.dismiss(); setCalendarTarget('start'); setPage('calendar'); }}>
                   <Text style={styles.body}>{dueDate ? fullDate(dueDate) : recurrence ? '오늘부터' : '기한 없음'}</Text><Text>▾</Text>
                 </Pressable>
                 <Text style={styles.label}>반복</Text>
                 <RecurrencePicker value={recurrence} startDate={dueDate ?? dateKey(new Date())} onChange={setRecurrence} />
+                {recurrence && <>
+                  <Text style={styles.label}>반복 종료일 (선택)</Text>
+                  <Pressable accessibilityRole="button" style={styles.field} onPress={() => { Keyboard.dismiss(); setCalendarTarget('end'); setPage('calendar'); }}>
+                    <Text style={styles.body}>{endDate ? fullDate(endDate) : '종료일 없음'}</Text><Text>▾</Text>
+                  </Pressable>
+                </>}
                 <View style={styles.row}>
                   <Pressable accessibilityRole="button" style={styles.button} onPress={() => { Keyboard.dismiss(); setPage('delete'); }}><Text style={styles.danger}>삭제</Text></Pressable>
                   <Pressable accessibilityRole="button" accessibilityState={{ disabled: !title.trim() }} disabled={!title.trim()}
