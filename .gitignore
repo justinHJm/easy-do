@@ -50,6 +50,7 @@ GoogleService-Info.plist
 *.jceks
 local.properties
 *.local.json
+.local/
 .claude/settings.local.json
 .codex/auth.json
 .codex/sessions/
