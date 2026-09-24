@@ -20,3 +20,24 @@
 
 - commit/push/tag/release/force push 및 원격 변경은 각각 사용자 명시 요청 없이는 금지한다. 기존 변경을 임의로 stage/reset/unstage하지 않는다.
 - 운영 명령과 실행·검증·빌드·커밋·릴리스 절차는 프로젝트 문서와 해당 skill 지침에서 필요할 때만 확인한다.
+
+## 개발 기록
+
+easy-do의 장기 개발 기록은 별도 자동화가 Git 변경사항과 Codex 작업 기록을 종합해 Google Drive의 DevLog, Troubleshooting, Backlog, Roadmap 등에 정리한다. Codex는 매 작업마다 사람이 읽는 완성형 DevLog를 직접 작성하지 않고, 의미 있는 작업이 끝났을 때 자동화용 짧은 메모만 `docs/DEVLOG_PENDING.md`에 남긴다.
+
+### 기록 대상
+
+- 실제 기능 추가·제거, 사용자 동작 또는 데이터 구조 변경, 버그 수정
+- 반복 실패 뒤 원인을 해결한 작업, Reviewer가 발견한 중요한 문제·회귀, rollback/revert
+- 중요한 설계 결정, build/native/storage/widget/lifecycle 관련 문제, 다음 작업에 영향을 주는 기술적 결정
+- 다음 세션에서 이어야 하는 중요한 WIP
+
+단순 문구·spacing·색상·사소한 스타일·주석 변경이나 의미 없는 정리는 별도 기록 가치가 없으면 남기지 않는다.
+
+### 기록 형식과 원칙
+
+- 날짜 항목이 있으면 그 아래에, 없으면 `## YYYY-MM-DD`를 만들어 작업별로 `### 작업 제목`과 목적·구현·문제/원인·검증·남은 작업 중 필요한 항목만 짧게 기록한다.
+- 실제 구현과 검증 수준을 추측하지 않는다. 자동검증 완료, Reviewer PASS, 실기기 미검증, APK 미빌드, 미커밋, WIP, 배포 전, 원격 미반영처럼 실제 상태를 명시한다.
+- 이 파일은 최종 개발 연혁이 아니라 자동화용 원재료다. Git diff로 알기 어려운 변경 이유, 실패 원인, 버린 시도, 보류·롤백 이유, 미검증 항목을 우선 기록한다.
+
+`DEVLOG_PENDING.md`는 해당 기능 작업과 함께 commit할 수 있다. commit/push/tag/release 승인 규칙은 위 Git 규칙을 따르며, 특정 작업의 명시 승인이 있더라도 tag·release는 별도 명시 없이는 수행하지 않는다.
