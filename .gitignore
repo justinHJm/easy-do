@@ -47,7 +47,8 @@ GoogleService-Info.plist
 local.properties
 *.local.json
 
-# Tool-local state that can contain credentials or is regenerated per machine
+# Tool-local state and non-Git working material
+.local/
 .claude/settings.local.json
 .codex/auth.json
 .codex/sessions/
