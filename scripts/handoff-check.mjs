@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
 
 function runGit(args, { allowFailure = false } = {}) {
   try {
@@ -14,6 +15,21 @@ function runGit(args, { allowFailure = false } = {}) {
   }
 }
 
+function readSectionValue(content, heading) {
+  const lines = content.split(/\r?\n/);
+  const start = lines.findIndex((line) => line.trim() === `## ${heading}`);
+  if (start < 0) return null;
+
+  for (let index = start + 1; index < lines.length; index += 1) {
+    const line = lines[index].trim();
+    if (line.startsWith('## ')) break;
+    if (line && !line.startsWith('<!--')) return line;
+  }
+
+  return null;
+}
+
+const currentWorkPath = 'docs/CURRENT_WORK.md';
 const branch = runGit(['branch', '--show-current']) || '(detached HEAD)';
 const status = runGit(['status', '--short']);
 
@@ -47,6 +63,19 @@ if (upstream) {
   console.log('upstream: 없음');
 }
 
+console.log('\nCURRENT_WORK:');
+let currentWorkState = null;
+if (!existsSync(currentWorkPath)) {
+  console.log(`- ${currentWorkPath} 없음: 환경 전환 전에 handoff 인계문서를 만들어야 합니다.`);
+} else {
+  const currentWork = readFileSync(currentWorkPath, 'utf8');
+  currentWorkState = readSectionValue(currentWork, '상태');
+  console.log(`- 상태: ${currentWorkState || '알 수 없음'}`);
+  if (status.includes(currentWorkPath)) {
+    console.log('- CURRENT_WORK에 미커밋 변경이 있습니다. 다른 환경에는 아직 전달되지 않습니다.');
+  }
+}
+
 console.log('\n작업 트리:');
 if (status) {
   console.log(status);
@@ -57,6 +86,12 @@ if (status) {
 }
 
 console.log('\n판정:');
+if (!existsSync(currentWorkPath)) {
+  console.log('- CURRENT_WORK 인계문서가 없어 환경 전환 준비가 완료되지 않았습니다.');
+} else if (currentWorkState === 'idle' && status) {
+  console.log('- CURRENT_WORK는 idle인데 작업 트리에 변경이 있습니다. handoff로 현재 작업을 먼저 기록하세요.');
+}
+
 if (!upstream) {
   console.log('- 현재 브랜치에 upstream이 없습니다. 원격 전환용 브랜치라면 upstream 설정 여부를 확인하세요.');
 } else if (ahead > 0 && behind > 0) {

@@ -1,3 +1,6 @@
+# Keep this file aligned with .gitignore. EAS uses it instead of .gitignore
+# when creating the uploaded build archive.
+
 # Dependencies and package-manager caches
 node_modules/
 /.npm-cache/
@@ -47,8 +50,7 @@ GoogleService-Info.plist
 local.properties
 *.local.json
 
-# Tool-local state and non-Git working material
-.local/
+# Tool-local state that can contain credentials or is regenerated per machine
 .claude/settings.local.json
 .codex/auth.json
 .codex/sessions/

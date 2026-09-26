@@ -7,7 +7,7 @@ export type PrivacyPolicySection = {
 // 앱과 docs/privacy.html은 이 원문을 기준으로 함께 갱신합니다.
 export const PRIVACY_POLICY_TITLE = 'easy-do 개인정보처리방침';
 export const PRIVACY_POLICY_EFFECTIVE_DATE = '2026년 9월 18일';
-export const PRIVACY_POLICY_WEB_URL: string | null = null;
+export const PRIVACY_POLICY_WEB_URL = 'https://justinhjm.github.io/easy-do/privacy.html';
 
 export const PRIVACY_POLICY_INTRO = 'easy-do는 사용자의 개인정보를 중요하게 생각하며, 서비스 제공에 필요한 최소한의 정보만 처리하는 것을 원칙으로 합니다.';
 

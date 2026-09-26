@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState, Platform } from 'react-native';
+import { AppState, NativeModules, Platform } from 'react-native';
 import { loadData, saveData, resetStoredData } from '@/storage/todo-storage';
 import { emptyData, initializeLocalData, getTodoSummary, rollover, updateData, visibleTodos, type DataAction } from '@/utils/todo-state';
 import { dateKey } from '@/utils/due-date';
@@ -9,6 +9,8 @@ import type { HydrationState, TodoData, TodoEdits, TodoPriority, TodoView } from
 export const HYDRATION_TIMEOUT_MS = 15000;
 
 function refreshTodoWidget() {
+  // Expo Go에는 위젯 네이티브 모듈이 없으므로 호출하지 않습니다.
+  if (Platform.OS !== 'android' || NativeModules.ExponentConstants?.executionEnvironment === 'storeClient') return;
   // 앱 실행 환경에서만 위젯 모듈을 불러와 기존 저장소 단위 검사를 유지합니다.
   void import('@/widgets/request-todo-widget-update')
     .then(({ requestTodoWidgetUpdate }) => requestTodoWidgetUpdate())
