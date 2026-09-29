@@ -20,6 +20,9 @@
 
 - commit/push/tag/release/force push 및 원격 변경은 각각 사용자 명시 요청 없이는 금지한다. 기존 변경을 임의로 stage/reset/unstage하지 않는다.
 - 운영 명령과 실행·검증·빌드·커밋·릴리스 절차는 프로젝트 문서와 해당 skill 지침에서 필요할 때만 확인한다.
+- 로컬 PC와 Codespace 등 개발환경을 바꿀 때는 `docs/CURRENT_WORK.md`를 임시 인계문서로 사용한다. 나가기 전에는 handoff skill, 새 환경에서는 resume-work skill을 우선한다.
+- `CURRENT_WORK.md`는 실제 코드/Git보다 우선하지 않는다. 비밀값을 기록하지 않고, 완료된 장기 기록은 기존 CHANGELOG/DEVLOG 체계로 넘긴 뒤 idle로 정리한다.
+- handoff 요청은 `CURRENT_WORK.md` 갱신과 읽기/검사 명령을 허용할 뿐 commit/push/pull/stash/reset 권한을 뜻하지 않는다.
 
 ## 개발 기록
 
