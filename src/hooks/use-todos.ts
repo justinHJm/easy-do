@@ -198,7 +198,7 @@ export function useTodos() {
     updateSettings: (changes: { characterReactions?: boolean; welcomeMessages?: boolean; tutorialCompleted?: boolean }) => send({ type: 'settings', changes }),
     openTutorial: () => setTutorialVisible(true),
     completeTutorial: () => { setTutorialVisible(false); send({ type: 'settings', changes: { tutorialCompleted: true } }); },
-    addTodo: (title: string, priority: TodoPriority = 'none', listId?: number) => send({ type: 'add', title, priority, listId }),
+    addTodo: (title: string, priority: TodoPriority = 'none', listId?: number, dueToday = false) => send({ type: 'add', title, priority, listId, dueToday }),
     editTodo: (id: number, changes: TodoEdits) => send({ type: 'edit', id, changes }),
     deleteTodo: (id: number) => send({ type: 'delete', id }),
     toggleTodo: (id: number, occurrenceDate?: string) => send({ type: 'toggle', id, occurrenceDate }),

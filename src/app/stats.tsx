@@ -64,9 +64,16 @@ export default function StatsScreen() {
             <Text style={styles.note}>이번 주 예정 회차 기준</Text>
             <View style={styles.row}><Text style={styles.value}>완료 {stats.routines.completed} / 예정 {stats.routines.scheduled}회</Text>
               <Text style={styles.rate}>{stats.routines.rate}%</Text></View>
-            <View style={styles.dots} accessible accessibilityLabel={`이번 주 루틴 ${stats.routines.completed}회 완료, ${stats.routines.scheduled}회 예정`}>
-              {Array.from({ length: stats.routines.scheduled }, (_, index) => <View key={index} style={[styles.dot, index < stats.routines.completed && styles.dotCompleted]} />)}
-            </View>
+            {stats.routines.items.map((routine) => <View key={routine.todoId} style={styles.routine}>
+              <View style={styles.row}>
+                <Text style={[styles.value, styles.routineName]}>{routine.title}{routine.archived ? ' (완료 이력)' : ''}</Text>
+                <Text style={[styles.value, styles.routineCount]}>{routine.completed} / {routine.scheduled}회</Text>
+              </View>
+              <View style={styles.dots} accessible accessibilityLabel={`${routine.title}, ${routine.completed}회 완료, ${routine.scheduled}회 예정`}>
+                {routine.occurrences.map((occurrence) => <View key={occurrence.date}
+                  style={[styles.dot, occurrence.completed && styles.dotCompleted]} />)}
+              </View>
+            </View>)}
             <Text style={styles.note}>예정 횟수는 현재 반복 규칙을 기준으로 추정해요. 삭제하거나 규칙을 바꾼 루틴도 완료한 회차는 포함해요.</Text>
             </>}
           </View>
@@ -75,10 +82,10 @@ export default function StatsScreen() {
             <Text style={styles.note}>반복하지 않는 할 일 기준이에요.</Text>
             {stats.todos.totalCompleted === 0 && stats.todos.pending === 0 ?
               <Text style={styles.note}>아직 Todo가 없어요. 홈에서 할 일을 추가해 보세요.</Text> : <>
-              <View style={[styles.row, styles.primaryRow]}><Text style={styles.value}>오늘 완료</Text><Text style={styles.primaryValue}>{stats.todos.todayCompleted}개</Text></View>
-              <View style={styles.row}><Text style={styles.value}>이번 주 완료</Text><Text style={styles.green}>{stats.todos.weekCompleted}개</Text></View>
+              <View style={styles.row}><Text style={styles.value}>오늘 완료</Text><Text style={styles.primaryValue}>{stats.todos.todayCompleted}개</Text></View>
+              <View style={styles.row}><Text style={styles.value}>이번 주 완료</Text><Text style={[styles.value, styles.green]}>{stats.todos.weekCompleted}개</Text></View>
               <View style={styles.row}><Text style={styles.value}>누적 완료</Text><Text style={styles.value}>{stats.todos.totalCompleted}개</Text></View>
-              <View style={[styles.row, styles.primaryRow]}><Text style={styles.value}>남은 할 일</Text><Text style={styles.primaryValue}>{stats.todos.pending}개</Text></View>
+              <View style={styles.row}><Text style={styles.value}>남은 할 일</Text><Text style={styles.primaryValue}>{stats.todos.pending}개</Text></View>
               <View style={styles.row}><Text style={styles.value}>기한 지난 할 일</Text><Text style={styles.value}>{stats.todos.overdue}개</Text></View>
               <Text style={styles.note}>기한 지난 할 일은 남은 할 일에 포함돼요.</Text>
             </>}
@@ -107,8 +114,9 @@ const styles = StyleSheet.create({
   todayBar: { backgroundColor: colors.primary }, green: { color: colors.primary, fontWeight: '700' },
   day: { fontSize: 12, color: colors.textSecondary }, date: { fontSize: 10, color: colors.textSecondary },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
-  primaryRow: { paddingVertical: 3 }, value: { fontSize: 14, color: colors.text }, primaryValue: { fontSize: 20, fontWeight: '700', color: colors.primary }, rate: { fontSize: 24, fontWeight: '700', color: colors.primary },
+  value: { fontSize: 14, color: colors.text }, primaryValue: { fontSize: 14, fontWeight: '700', color: colors.primary }, rate: { fontSize: 24, fontWeight: '700', color: colors.primary },
   dots: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, minHeight: 16 },
+  routine: { gap: 7, paddingVertical: 4 }, routineName: { flex: 1, minWidth: 0 }, routineCount: { flexShrink: 0 },
   dot: { width: 12, height: 12, borderRadius: 6, backgroundColor: colors.backgroundSelected }, dotCompleted: { backgroundColor: colors.primary },
   empty: { gap: 8 }, retry: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' },
 });

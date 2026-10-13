@@ -122,7 +122,7 @@ export function getTodoSummary<T extends Todo>(todos: readonly T[]) {
 export type DataAction =
   | { type: 'profile'; displayName: string; avatar: string }
   | { type: 'settings'; changes: { characterReactions?: boolean; welcomeMessages?: boolean; tutorialCompleted?: boolean } }
-  | { type: 'add'; title: string; priority?: Todo['priority']; listId?: number }
+  | { type: 'add'; title: string; priority?: Todo['priority']; listId?: number; dueToday?: boolean }
   | { type: 'edit'; id: number; changes: TodoEdits }
   | { type: 'delete' | 'toggle'; id: number; occurrenceDate?: string }
   | { type: 'list-add'; name: string }
@@ -145,7 +145,8 @@ export function updateData(original: TodoData, action: DataAction, now: string):
     case 'add': {
       if (!action.title.trim()) return data;
       const todo: Todo = { id: data.nextId, title: action.title.trim(), priority: action.priority ?? 'none',
-        completed: false, createdAt: now, listId: validList(action.listId) };
+        completed: false, createdAt: now, listId: validList(action.listId),
+        ...(action.dueToday ? { dueDate: today } : {}) };
       return { ...data, nextId: data.nextId + 1, todos: [...data.todos, todo] };
     }
     case 'edit': {

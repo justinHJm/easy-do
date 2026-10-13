@@ -572,7 +572,9 @@ test('루틴 통계: 현재 규칙 예정·삭제된 완료 보존·빈 분모·
   let data = reduce(core.emptyData(), { type: 'add', title: '매일' });
   data = reduce(data, { type: 'edit', id: 1, changes: { title: '매일', priority: 'none', recurrence: { type: 'daily', startDate: '2026-09-07' } } });
   data = reduce(data, { type: 'toggle', id: 1 });
-  assert.deepEqual(plain(stats.getStatistics(data, '2026-09-07').routines), { completed: 1, scheduled: 7, rate: 14 });
+  const { items, ...aggregate } = stats.getStatistics(data, '2026-09-07').routines;
+  assert.deepEqual(plain(aggregate), { completed: 1, scheduled: 7, rate: 14 });
+  assert.equal(items.length, 1);
   data = reduce(data, { type: 'delete', id: 1 });
   assert.equal(stats.getStatistics(data, '2026-09-07').todayCount, 1);
   assert.equal(stats.getStatistics(data, '2026-09-07').routines.rate, 100);
@@ -580,6 +582,134 @@ test('루틴 통계: 현재 규칙 예정·삭제된 완료 보존·빈 분모·
   const monthly = { ...core.emptyData(), todos: [{ id: 1, title: '월말', priority: 'none', completed: false,
     recurrence: { type: 'monthly', startDate: '2026-01-01', day: 31 } }] };
   assert.equal(stats.getStatistics(monthly, '2026-02-28').routines.scheduled, 1);
+});
+
+function treeNodes(root) {
+  const result = [];
+  function visit(node) {
+    if (Array.isArray(node)) return node.forEach(visit);
+    if (!node || typeof node !== 'object') return;
+    result.push(node); visit(node.props?.children);
+  }
+  visit(root); return result;
+}
+
+test('홈 빠른 추가: 오늘 보기만 자동 기한, 다른 보기·리스트 선택 유지', () => {
+  const slots = []; let cursor = 0; const additions = [];
+  const data = { ...core.emptyData(), lists: [{ id: 1, name: '학교' }], today: '2026-09-07', loaded: true,
+    settings: { welcomeMessages: false, characterReactions: false }, getView: () => core.getTodoSummary([]),
+    addTodo: (...args) => additions.push(args) };
+  const { default: HomeScreen } = load('src/app/index.tsx', {
+    react: { useState(initial) { const i = cursor++; if (!slots[i]) slots[i] = { value: typeof initial === 'function' ? initial() : initial };
+      return [slots[i].value, (value) => { slots[i].value = value; }]; }, useRef: () => ({ current: null }), useEffect() {} },
+    'react/jsx-runtime': { jsx: (type, props) => ({ type, props }), jsxs: (type, props) => ({ type, props }) },
+    'react-native': { StyleSheet: { create: (styles) => styles }, Platform: { OS: 'android' },
+      View: 'View', Text: 'Text', Pressable: 'Pressable', SectionList: 'SectionList', KeyboardAvoidingView: 'KeyboardAvoidingView' },
+    'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' },
+    '@/constants/theme': { Colors: { light: {} } }, '@/constants/character': {},
+    '@/components/character-greeting': { CharacterGreeting: 'CharacterGreeting' },
+    '@/components/todo-input': { TodoInput: 'TodoInput' }, '@/components/todo-item': { TodoItem: 'TodoItem' },
+    '@/components/todo-editor': { TodoEditor: 'TodoEditor' },
+    '@/components/todo-views': { TodoViews: 'TodoViews', ListManager: 'ListManager', viewLabels: {} },
+    '@/contexts/todo-context': { useTodoContext: () => data }, '@/utils/due-date': dates,
+  });
+  function render() { cursor = 0; return treeNodes(HomeScreen()); }
+  for (const view of ['today', 'all', 'week', 'urgent', 'routine', 'list:1']) {
+    render().find((node) => node.type === 'TodoViews').props.onChange(view);
+    const input = render().find((node) => node.type === 'TodoInput').props;
+    assert.equal(input.defaultListId, view === 'list:1' ? 1 : undefined);
+    input.onAdd('추가', 'high', 1);
+    assert.deepEqual(additions.at(-1), ['추가', 'high', 1, view === 'today']);
+  }
+});
+
+test('오늘 빠른 추가: 현지 자정 전후 즉시 표시·한 번 저장·완료 취소·저장 호환', async () => {
+  const { storage } = fixture(); const writes = [];
+  const h = harness({ loadData: () => storage.loadData(now), saveData: async (data) => { writes.push(plain(data)); await storage.saveData(data); } });
+  h.render(); await tick(); let hook = h.render(); await tick();
+  const before = writes.length;
+  h.foreground(new Date(2026, 8, 7, 23, 59, 59).toISOString()); await tick();
+  hook = h.render(); hook.addTodo('자정 전', 'high', undefined, true);
+  hook = h.render(); assert.equal(hook.todos.at(-1).dueDate, '2026-09-07');
+  assert.equal(hook.getView('today').incompleteTodos.length, 1); await tick();
+  assert.equal(writes.length, before + 1);
+  h.foreground(new Date(2026, 8, 8, 0, 0, 1).toISOString()); await tick();
+  hook = h.render(); hook.addTodo('자정 후', 'none', undefined, true);
+  hook = h.render(); assert.equal(hook.todos.at(-1).dueDate, '2026-09-08');
+  assert.equal(ids(hook.getView('today').incompleteTodos), '2');
+  hook.toggleTodo(2); hook = h.render(); assert.equal(hook.getView('today').completedTodos.length, 1);
+  hook.toggleTodo(2); hook = h.render(); assert.equal(hook.getView('today').incompleteTodos.length, 1);
+  hook.addTodo('기한 없음'); hook = h.render(); assert.equal(hook.todos.at(-1).dueDate, undefined);
+  await tick(); const restored = await storage.loadData(now);
+  assert.deepEqual(plain(restored.todos), plain(hook.todos)); assert.equal(restored.schemaVersion, 3);
+  h.unmount();
+});
+
+test('루틴별 통계: 여러 규칙·종료일·회차 날짜별 점·중복 제거·전체 합계', () => {
+  let data = core.emptyData();
+  for (const [title, recurrence] of [
+    ['매일', { type: 'daily', startDate: '2026-09-07', endDate: '2026-09-09' }],
+    ['주간', { type: 'weekly', startDate: '2026-09-07', weekdays: [1, 3, 5] }],
+    ['월간', { type: 'monthly', startDate: '2026-09-07', day: 10 }],
+  ]) {
+    data = reduce(data, { type: 'add', title });
+    data = reduce(data, { type: 'edit', id: data.todos.at(-1).id, changes: { title, priority: 'none', recurrence } });
+  }
+  data = reduce(data, { type: 'toggle', id: 1 }, new Date(2026, 8, 8, 12).toISOString());
+  data = reduce(data, { type: 'toggle', id: 2 }, new Date(2026, 8, 9, 12).toISOString());
+  data = reduce(data, { type: 'toggle', id: 3 }, new Date(2026, 8, 10, 12).toISOString());
+  const duplicate = { ...data, completions: [...data.completions, data.completions[0]] };
+  const result = stats.getStatistics(duplicate, '2026-09-10').routines;
+  assert.deepEqual(plain(result.items.map((item) => [item.completed, item.scheduled])), [[1, 3], [1, 3], [1, 1]]);
+  assert.deepEqual(plain(result.items[0].occurrences.map((day) => day.completed)), [false, true, false]);
+  assert.equal(result.completed, 3); assert.equal(result.scheduled, 7); assert.equal(result.rate, 43);
+  assert.equal(result.completed, result.items.reduce((sum, item) => sum + item.completed, 0));
+  assert.equal(result.scheduled, result.items.reduce((sum, item) => sum + item.scheduled, 0));
+  assert.deepEqual(plain(result), plain(stats.getStatistics(data, '2026-09-10').routines));
+  assert.deepEqual(plain(stats.getStatistics(data, '2026-09-14').routines.items.map((item) => item.completed)), [0, 0, 0]);
+});
+
+test('루틴별 통계: 삭제·규칙 변경·일반 전환 완료 이력과 snapshot 저장 보존', async () => {
+  let data = core.emptyData();
+  for (const title of ['삭제 루틴', '변경 루틴', '전환 루틴']) {
+    data = reduce(data, { type: 'add', title });
+    const id = data.todos.at(-1).id;
+    data = reduce(data, { type: 'edit', id, changes: { title, priority: 'none', recurrence: { type: 'daily', startDate: '2026-09-07' } } });
+    data = reduce(data, { type: 'toggle', id });
+  }
+  data = reduce(data, { type: 'delete', id: 1 });
+  data = reduce(data, { type: 'edit', id: 2, changes: { title: '새 이름', priority: 'none', recurrence: { type: 'weekly', startDate: '2026-09-07', weekdays: [3] } } });
+  data = reduce(data, { type: 'edit', id: 3, changes: { title: '일반 Todo', priority: 'none', recurrence: undefined } }, tomorrow);
+  const result = stats.getStatistics(data, '2026-09-08').routines;
+  assert.deepEqual(plain(result.items.map((item) => [item.title, item.archived, item.completed, item.scheduled])),
+    [['삭제 루틴', true, 1, 1], ['새 이름', false, 1, 2], ['전환 루틴', true, 1, 1]]);
+  assert.equal(result.completed, 3); assert.equal(result.scheduled, 4); assert.equal(result.rate, 75);
+  assert.equal(data.completions.length, 3);
+  const { storage } = fixture(); await storage.saveData(data);
+  const restored = await storage.loadData(now);
+  assert.deepEqual(plain(restored.completions), plain(data.completions));
+  assert.deepEqual(plain(stats.getStatistics(restored, '2026-09-08').routines), plain(result));
+});
+
+test('완료 체크박스: 사각형·터치 영역·접근성·완료 취소 콜백 유지', () => {
+  const { TodoItem } = load('src/components/todo-item.tsx', {
+    'react/jsx-runtime': { jsx: (type, props) => ({ type, props }), jsxs: (type, props) => ({ type, props }) },
+    'react-native': { StyleSheet: { create: (styles) => styles }, Pressable: 'Pressable', View: 'View', Text: 'Text' },
+    '@/components/priority-badge': { PriorityBadge: 'PriorityBadge' }, '@/constants/theme': { Colors: { light: {} } },
+    '@/utils/due-date': dates, '@/utils/todo-state': core,
+  });
+  for (const completed of [false, true]) {
+    let toggled;
+    const nodes = treeNodes(TodoItem({ todo: { id: 1, title: '완료', priority: 'none', completed },
+      onToggle: (id) => { toggled = id; }, onEdit() {}, today: new Date(now) }));
+    const checkbox = nodes.find((node) => node.props?.accessibilityRole === 'checkbox');
+    assert.equal(checkbox.props.accessibilityState.checked, completed);
+    checkbox.props.onPress(); assert.equal(toggled, 1);
+    assert.equal(checkbox.props.style({ pressed: false })[0].width, 48);
+    assert.equal(checkbox.props.children.props.style[0].width, 24);
+    assert.equal(nodes.some((node) => node.props?.children === '✓'), false);
+    assert.equal(nodes.filter((node) => node.type === 'View' && node.props?.style?.width === 17).length, completed ? 1 : 0);
+  }
 });
 
 test('로컬 프로필 최초 생성·식별자 유지·설정 및 기존 추가 필드 보존', async () => {

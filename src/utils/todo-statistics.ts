@@ -63,29 +63,47 @@ export function getStatistics(data: TodoData, today: string) {
     pending: pendingTodos.length,
     overdue: pendingTodos.filter((todo) => todo.dueDate && todo.dueDate < today).length,
   };
-  const scheduled = new Set<string>();
+  const routineGroups = new Map<number, {
+    todoId: number; title: string; archived: boolean; dates: Map<string, boolean>; latestCompletedAt?: string;
+  }>();
   for (const todo of data.todos) {
     if (!todo.recurrence) continue;
+    const group = { todoId: todo.id, title: todo.title, archived: false, dates: new Map<string, boolean>() };
+    routineGroups.set(todo.id, group);
     for (const day of weekDates) {
-      if (nextOccurrence(todo.recurrence, day) === day) scheduled.add(`${todo.id}:${day}`);
+      if (nextOccurrence(todo.recurrence, day) === day) group.dates.set(day, false);
     }
   }
-  const completed = new Set<string>();
   for (const completion of data.completions) {
     if (completion.occurrenceDate >= weekStart && completion.occurrenceDate <= weekEnd) {
-      const key = `${completion.todoId}:${completion.occurrenceDate}`;
-      completed.add(key);
       // 과거 규칙 변경 이력이 없으므로 예정 횟수는 추정입니다. 이미 완료한 회차는
       // 삭제·규칙 변경 뒤에도 분모에 포함해 기록 유실과 100% 초과를 막습니다.
-      scheduled.add(key);
+      const group = routineGroups.get(completion.todoId) ?? {
+        todoId: completion.todoId, title: completion.snapshot.title, archived: true,
+        dates: new Map<string, boolean>(), latestCompletedAt: undefined,
+      };
+      // 삭제되거나 일반 Todo로 바뀐 루틴은 가장 최근 완료 당시의 이름을 표시합니다.
+      if (group.archived && (!group.latestCompletedAt || Date.parse(completion.completedAt) > Date.parse(group.latestCompletedAt))) {
+        group.title = completion.snapshot.title;
+        group.latestCompletedAt = completion.completedAt;
+      }
+      group.dates.set(completion.occurrenceDate, true);
+      routineGroups.set(completion.todoId, group);
     }
   }
+  const items = [...routineGroups.values()].sort((a, b) => a.todoId - b.todoId).map((group) => {
+    const occurrences = [...group.dates].sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, completed]) => ({ date, completed }));
+    return { todoId: group.todoId, title: group.title, archived: group.archived,
+      scheduled: occurrences.length, completed: occurrences.filter((day) => day.completed).length, occurrences };
+  });
+  const scheduled = items.reduce((sum, item) => sum + item.scheduled, 0);
+  const completed = items.reduce((sum, item) => sum + item.completed, 0);
   return {
     total: records.length,
     todayCount: dailyCounts.get(today) ?? 0,
     weekCount: weekDates.reduce((sum, day) => sum + (dailyCounts.get(day) ?? 0), 0),
     weekStart, weekEnd, lastSevenDays, todos,
-    routines: { completed: completed.size, scheduled: scheduled.size,
-      rate: scheduled.size ? Math.round(completed.size / scheduled.size * 100) : 0 },
+    routines: { completed, scheduled, rate: scheduled ? Math.round(completed / scheduled * 100) : 0, items },
   };
 }

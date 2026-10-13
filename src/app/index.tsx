@@ -99,7 +99,8 @@ export default function HomeScreen() {
         {storageError && <Pressable accessibilityRole="button" onPress={retryStorage} style={styles.storageNotice}>
           <Text style={styles.error}>{storageError} · 다시 시도</Text>
         </Pressable>}
-        <TodoInput onAdd={addTodo} lists={lists} defaultListId={selectedList?.id} disabled={!loaded} />
+        <TodoInput onAdd={(title, priority, listId) => addTodo(title, priority, listId, activeView === 'today')}
+          lists={lists} defaultListId={selectedList?.id} disabled={!loaded} />
         <TodoViews view={activeView} lists={lists} onChange={setView} onManage={() => { if (loaded) setManagingLists(true); }} />
         <SectionList
           style={styles.list}

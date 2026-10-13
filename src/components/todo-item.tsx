@@ -23,7 +23,7 @@ export function TodoItem({ todo, onToggle, onEdit, today }: { todo: VisibleTodo;
         accessibilityState={{ checked: todo.completed }} onPress={() => onToggle(todo.id, todo.occurrenceDate)}
         style={({ pressed }) => [styles.touchTarget, pressed && styles.pressed]}>
         <View style={[styles.checkbox, todo.completed && styles.checked]}>
-          {todo.completed && <Text allowFontScaling={false} style={styles.checkmark}>✓</Text>}
+          {todo.completed && <View style={styles.checkmark} />}
         </View>
       </Pressable>
     </View>
@@ -40,10 +40,6 @@ const styles = StyleSheet.create({
   touchTarget: { width: 48, minHeight: 48, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   checkbox: { width: 24, height: 24, borderWidth: 1.5, borderColor: colors.primary, borderRadius: 7, alignItems: 'center', justifyContent: 'center' },
   checked: { backgroundColor: '#F8DEDE', borderColor: '#C45353' },
-  checkmark: {
-    color: '#B52F3B', fontSize: 23, fontWeight: '800',
-    width: 24, height: 24, lineHeight: 24,
-    textAlign: 'center', textAlignVertical: 'center', includeFontPadding: false,
-  },
+  checkmark: { width: 17, height: 17, borderRadius: 3, backgroundColor: '#B52F3B' },
   pressed: { opacity: 0.6 },
 });
