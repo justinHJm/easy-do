@@ -4,7 +4,8 @@ import type { Recurrence, Todo, TodoEdits, TodoList, TodoPriority } from '@/type
 import { Colors } from '@/constants/theme';
 import { PriorityBadge, priorityLabels } from '@/components/priority-badge';
 import { TodoCalendar } from '@/components/todo-calendar';
-import { dateKey, fullDate } from '@/utils/due-date';
+import { dateKey, fullDate, isDueDate } from '@/utils/due-date';
+import { validRecurrence } from '@/utils/todo-state';
 import { ListChoices } from '@/components/todo-views';
 import { RecurrencePicker } from '@/components/recurrence-picker';
 
@@ -27,9 +28,12 @@ export function TodoEditor({ todo, lists, onSave, onDelete, onClose }: {
     // dueDate가 undefined이면 기한 제거를 뜻합니다. 완료 여부는 편집 대상에 포함하지 않습니다.
     // 반복의 시작일은 날짜 전용 값입니다. 사용자가 달력을 비웠으면 오늘부터 시작합니다.
     const startDate = dueDate ?? dateKey(new Date());
-    if (recurrence && endDate && endDate < startDate) return;
+    // undefined도 덮어써야 원본의 종료일이 제거되고, 잘못된 날짜는 편집 상태를 유지합니다.
+    const nextRecurrence = recurrence ? { ...recurrence, startDate, endDate } : undefined;
+    if ((dueDate !== undefined && !isDueDate(dueDate)) ||
+        (nextRecurrence && !validRecurrence(nextRecurrence))) return;
     onSave(todo.id, { title: title.trim(), priority, dueDate, listId,
-      recurrence: recurrence ? { ...recurrence, startDate, ...(endDate ? { endDate } : {}) } : undefined });
+      recurrence: nextRecurrence });
     onClose();
   }
   return (

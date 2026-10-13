@@ -206,6 +206,102 @@ test('루틴 종료일: 종료 당일까지 표시·통계 예정 회차 제한�
   assert.equal(core.nextOccurrence(legacy, '2026-09-20'), '2026-09-20');
 });
 
+// 실제 편집기의 이벤트와 저장 결과를 검사합니다. 네이티브 렌더링·레이아웃 검사는 아닙니다.
+function editorHarness(recurrence) {
+  const slots = []; let cursor = 0; let closes = 0; const saves = [];
+  const element = (type, props) => ({ type, props });
+  const todo = { id: 1, title: '루틴', priority: 'none', completed: false, recurrence };
+  const { TodoEditor } = load('src/components/todo-editor.tsx', {
+    react: { useState(initial) {
+      const i = cursor++;
+      if (!slots[i]) slots[i] = { value: initial };
+      return [slots[i].value, (value) => { slots[i].value = value; }];
+    } },
+    'react/jsx-runtime': { jsx: element, jsxs: element, Fragment: 'Fragment' },
+    'react-native': { Keyboard: { dismiss() {} }, Platform: { OS: 'android' },
+      StyleSheet: { create: (styles) => styles }, KeyboardAvoidingView: 'KeyboardAvoidingView',
+      Modal: 'Modal', Pressable: 'Pressable', ScrollView: 'ScrollView', Text: 'Text',
+      TextInput: 'TextInput', View: 'View' },
+    '@/constants/theme': { Colors: { light: {} } },
+    '@/components/priority-badge': { PriorityBadge: 'PriorityBadge', priorityLabels: {} },
+    '@/components/todo-calendar': { TodoCalendar: 'TodoCalendar' },
+    '@/components/todo-views': { ListChoices: 'ListChoices' },
+    '@/components/recurrence-picker': { RecurrencePicker: 'RecurrencePicker' },
+    '@/utils/due-date': dates, '@/utils/todo-state': core,
+  });
+  function nodes() {
+    cursor = 0;
+    const result = [];
+    function visit(node) {
+      if (Array.isArray(node)) return node.forEach(visit);
+      if (!node || typeof node !== 'object') return;
+      result.push(node); visit(node.props?.children);
+    }
+    visit(TodoEditor({ todo, lists: [], onSave: (id, changes) => saves.push({ id, changes }),
+      onDelete() {}, onClose: () => closes++ }));
+    return result;
+  }
+  return {
+    saves, get closes() { return closes; },
+    date(target, value) {
+      const fields = nodes().filter((node) => node.type === 'Pressable' &&
+        node.props.children?.[0]?.type === 'Text' && node.props.children?.[1]?.props.children === '▾');
+      fields[target === 'start' ? 0 : 1].props.onPress();
+      nodes().find((node) => node.type === 'TodoCalendar').props.onConfirm(value);
+    },
+    save() {
+      nodes().find((node) => node.type === 'Pressable' && node.props.children?.props?.children === '저장').props.onPress();
+    },
+    recurrence() { return nodes().find((node) => node.type === 'RecurrencePicker').props.value; },
+  };
+}
+
+for (const [label, initialEnd, nextEnd] of [
+  ['추가', undefined, '2026-09-15'], ['변경', '2026-09-10', '2026-09-20'],
+  ['제거', '2026-09-10', undefined],
+]) {
+  test(`편집기: 종료일 ${label} 후 저장·복원`, async () => {
+    const rule = { type: 'daily', startDate: '2026-09-07', ...(initialEnd ? { endDate: initialEnd } : {}) };
+    const h = editorHarness(rule); h.date('end', nextEnd); h.save();
+    assert.equal(h.saves.length, 1); assert.equal(h.closes, 1);
+    assert.equal(h.saves[0].changes.recurrence.endDate, nextEnd);
+    assert.deepEqual(plain(rule), { type: 'daily', startDate: '2026-09-07', ...(initialEnd ? { endDate: initialEnd } : {}) });
+    const initial = { ...core.emptyData(), todos: [{ id: 1, title: '루틴', priority: 'none', completed: false, recurrence: rule }] };
+    const updated = reduce(initial, { type: 'edit', id: 1, changes: h.saves[0].changes });
+    const { storage } = fixture(); await storage.saveData(updated);
+    assert.equal((await storage.loadData(now)).todos[0].recurrence.endDate, nextEnd);
+  });
+}
+
+test('편집기: 시작일을 기존 종료일 이후로 옮기면 종료일 제거 후 저장', () => {
+  const h = editorHarness({ type: 'daily', startDate: '2026-09-07', endDate: '2026-09-10' });
+  h.date('start', '2026-09-20'); h.save();
+  assert.equal(h.saves.length, 1); assert.equal(h.closes, 1);
+  assert.deepEqual(plain(h.saves[0].changes.recurrence), { type: 'daily', startDate: '2026-09-20' });
+  assert.equal(core.validRecurrence(h.saves[0].changes.recurrence), true);
+});
+
+test('편집기: 종료일 없는 기존 매일·매주·매월 루틴 보존', () => {
+  for (const rule of [{ type: 'daily', startDate: '2026-09-07' },
+    { type: 'weekly', startDate: '2026-09-07', weekdays: [1, 3] },
+    { type: 'monthly', startDate: '2026-09-07', day: 31 }]) {
+    const h = editorHarness(rule); h.save();
+    assert.deepEqual(plain(h.saves[0].changes.recurrence), rule); assert.equal(h.closes, 1);
+  }
+});
+
+test('편집기: 잘못된 날짜·종료일 순서는 저장/닫기 없이 수정 후 재저장 가능', () => {
+  for (const [target, value] of [['start', '2026-02-30'], ['end', '2026-09-31'], ['end', '2026-09-06']]) {
+    const h = editorHarness({ type: 'daily', startDate: '2026-09-07' });
+    h.date(target, value); h.save();
+    assert.equal(h.saves.length, 0); assert.equal(h.closes, 0);
+    assert.equal(h.recurrence().type, 'daily');
+    h.date(target, '2026-09-15'); h.save();
+    assert.equal(h.saves.length, 1); assert.equal(h.closes, 1);
+    assert.equal(target === 'start' ? h.saves[0].changes.recurrence.startDate : h.saves[0].changes.recurrence.endDate, '2026-09-15');
+  }
+});
+
 test('달력 빈 칸·날짜 검증·현지 날짜·서머타임 경계', () => {
   assert.equal(dates.isDueDate('2028-02-29'), true); assert.equal(dates.isDueDate('2026-02-29'), false);
   assert.equal(dates.isDueDate('2026-04-31'), false);
