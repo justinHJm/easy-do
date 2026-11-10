@@ -75,6 +75,11 @@ async function handleTodoWidget({ widgetInfo, widgetAction, clickAction, clickAc
     // 위젯에서 계산한 초기화·완료 변경도 앱 저장본에 먼저 반영합니다.
     await saveData(data);
     renderWidget(data === loaded.data ? loaded.representation : renderTodoWidget(data, today, mode));
+    if (data !== loaded.data) {
+      // 완료 직후 두 종류의 모든 위젯 인스턴스도 같은 저장본으로 다시 그립니다.
+      const { requestTodoWidgetUpdate } = await import('@/widgets/request-todo-widget-update');
+      await requestTodoWidgetUpdate();
+    }
   } catch {
     if (typeof __DEV__ !== 'undefined' && __DEV__) console.warn('Todo widget update failed');
     // 저장소 또는 실제 데이터 렌더링 실패 시 기본 화면을 유지합니다.

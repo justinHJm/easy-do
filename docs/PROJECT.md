@@ -1,23 +1,24 @@
-# easy-do 프로젝트 규칙
+# easy-do 프로젝트 기준
 
-## 기술 스택과 Expo
+## 제품과 기술
 
-- Android Todo 앱이며 React Native + Expo SDK 57 + TypeScript를 사용한다. 단순하고 초보자가 읽기 쉬운 구조를 우선한다.
-- Expo 기능 구현 전 [Expo SDK 57 문서](https://docs.expo.dev/versions/v57.0.0/)와 실제 설치 버전을 확인한다. 최신 SDK API를 그대로 적용하지 않는다. 단순 실행에는 이미 확인한 문서를 다시 읽지 않는다.
+- easy-do는 Android 중심 Todo 앱이며 React Native, Expo SDK 57, TypeScript를 사용한다.
+- 빠르게 기록하고 확인하는 가벼운 Todo 경험을 우선한다. UI는 Todo 중심, 한국어 우선, 라이트·다크 모드를 유지한다.
+- 기존 저장 데이터와 사용자 동작을 깨지 않는 최소 변경을 우선한다.
 
-## UI와 캐릭터
+## 데이터와 주요 구조
 
-- UI는 흰 배경, 초록 강조, compact한 Todo 중심 화면을 사용한다. 체크박스는 오른쪽에 두고, 완료 항목은 회색+취소선으로 표시한다.
-- 우선순위는 높음/보통/낮음이며 기본값은 보통이다.
-- 캐릭터는 보조 요소다. 그림·말풍선·대사는 분리하고, 대사는 배열로 관리한다. 성장/보상은 요청 전 구현하지 않는다.
+- Todo, 목록, History, 반복 완료 기록, 프로필, 설정은 AsyncStorage의 단일 데이터 구조로 보관한다.
+- 날짜·반복·정렬 규칙은 `src/utils/`, 저장 호환은 `src/storage/`, 화면 공용 상태는 `src/contexts/`와 `src/hooks/`에 둔다.
+- 반복 Todo는 발생일 단위로 처리한다. 종료일이 없던 기존 반복 데이터는 계속 동작해야 한다.
 
-## 버전과 운영
+## Android와 Widget
 
-- 버전은 앱의 사용자 체감 변경이 완료된 논리 작업당 최대 1회 올린다. 작은 변경은 PATCH, 기능/마일스톤은 MINOR, 1.0.0은 사용자 승인 후 올린다. Reviewer가 필요한 작업은 PASS 후 판단한다.
-- 조사·문서·Codex 설정·테스트만이면 앱 버전을 유지한다. 재작업·후속 요청으로 같은 묶음을 중복 증가시키지 않는다. 증가할 때 CHANGELOG도 갱신한다.
-- 검증 상세는 `.agents/skills/verify/SKILL.md`를 따른다.
-- 운영·버전 명령은 `docs/CODEX.md`, 실행·검증·빌드·커밋·릴리스 절차는 각 `.agents/skills/*/SKILL.md`에서 필요할 때만 확인한다.
+- Android 홈 화면에는 오늘 Todo와 전체 Todo Widget이 있다.
+- `react-native-android-widget` config plugin이 `app.json`에 선언되어 있으며, Widget은 앱과 같은 저장 데이터를 사용한다.
+- 이 프로젝트는 CNG 방식이다. `android/`와 `ios/`는 생성물이며 Git에 포함하지 않는다. native 또는 config plugin 변경은 실제 Android 기기 검증이 필요하다.
 
-## Agent 검토 기준
+## 버전과 검증
 
-- AsyncStorage, Android native/Widget, Expo/build 설정은 Reviewer 사용 여부를 판단할 때 프로젝트 고유 위험 요소로 본다.
+- 표시 버전은 `app.json`, `package.json`, `package-lock.json`에서 함께 관리한다. Android versionCode는 EAS remote 관리와 별개다.
+- 변경 위험도와 실행할 검증은 `verify` Skill을 따른다. Android export나 자동 테스트는 실기기 Widget 동작을 대체하지 않는다.

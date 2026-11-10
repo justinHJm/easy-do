@@ -2,7 +2,7 @@
 export type TodoPriority = 'veryHigh' | 'high' | 'medium' | 'none';
 
 // 반복 규칙은 Todo의 선택 속성입니다. 회차별 완료 여부는 별도 Completion에 보관합니다.
-export type Recurrence = { startDate: string } & (
+export type Recurrence = { startDate: string; endDate?: string } & (
   | { type: 'daily' }
   | { type: 'weekly'; weekdays: number[] }
   | { type: 'monthly'; day: number }
