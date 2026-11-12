@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { AccessibilityInfo, Image, ImageBackground, Pressable, StyleSheet, Text, View } from 'react-native';
-import Animated, { cancelAnimation, useAnimatedStyle, useReducedMotion, useSharedValue, withDelay, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
+import Animated, { cancelAnimation, Easing, useAnimatedStyle, useReducedMotion, useSharedValue, withDelay, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
 
 import { bubbleImages, characterAlternateFrames, characterImages, type CharacterReaction } from '@/constants/character';
 import { Colors } from '@/constants/theme';
 import type { CharacterMotion } from '@/hooks/use-home-character';
+import { scheduleCharacterIdle } from '@/utils/character-idle';
 
 type Props = CharacterReaction & {
   active?: boolean;
@@ -20,6 +21,8 @@ export function CharacterGreeting({ mood, message, active = false, motion = 'idl
   const [reducedMotion, setReducedMotion] = useState(initialReducedMotion);
   const offset = useSharedValue(0);
   const frame = useSharedValue(0);
+  const breath = useSharedValue(0);
+  const lean = useSharedValue(0);
   const alternate = mood === 'idle' || mood === 'welcome' || mood === 'cheer' ? characterAlternateFrames[mood] : undefined;
   const primaryFrame = useAnimatedStyle(() => ({ opacity: 1 - frame.value }), [frame]);
   const alternateFrame = useAnimatedStyle(() => ({ opacity: frame.value }), [frame]);
@@ -27,6 +30,45 @@ export function CharacterGreeting({ mood, message, active = false, motion = 'idl
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: horizontal ? offset.value : 0 }, { translateY: horizontal ? 0 : offset.value }],
   }), [horizontal, offset]);
+  const idleStyle = useAnimatedStyle(() => ({
+    // The visible feet are at y≈62 in the padded 72px frame.
+    transformOrigin: [36, 62, 0],
+    transform: [
+      { rotate: `${lean.value}deg` },
+      { scaleX: 1 + breath.value * 0.009 },
+      { scaleY: 1 + breath.value * 0.023 },
+    ],
+  }));
+  const idle = active && !reducedMotion && motion === 'idle';
+
+  useEffect(() => {
+    if (!idle) return;
+    breath.value = withRepeat(withTiming(1, { duration: 1500, easing: Easing.inOut(Easing.sin) }), -1, true);
+    return () => {
+      cancelAnimation(breath);
+      breath.value = 0;
+    };
+  }, [breath, idle]);
+
+  useEffect(() => {
+    if (!idle || mood !== 'idle') return;
+    const stop = scheduleCharacterIdle((action) => {
+      if (action === 'blink') {
+        frame.value = withSequence(withTiming(1, { duration: 0 }), withDelay(115, withTiming(0, { duration: 0 })));
+      } else {
+        const direction = Math.random() < 0.5 ? -1 : 1;
+        lean.value = withSequence(
+          withTiming(direction * 3, { duration: 330 }),
+          withDelay(260, withTiming(0, { duration: 420 })),
+        );
+      }
+    });
+    return () => {
+      stop();
+      cancelAnimation(lean);
+      lean.value = 0;
+    };
+  }, [frame, idle, lean, mood]);
 
   useEffect(() => {
     if (!active) return;
@@ -51,9 +93,6 @@ export function CharacterGreeting({ mood, message, active = false, motion = 'idl
     if (!active || reducedMotion) return;
     switch (motion) {
       case 'idle':
-        offset.value = withRepeat(withDelay(8000, withSequence(
-          withTiming(-2, { duration: 300 }), withTiming(0, { duration: 350 }),
-        )), -1);
         break;
       case 'welcome':
         offset.value = withSequence(withTiming(-3, { duration: 160 }), withTiming(3, { duration: 260 }), withTiming(0, { duration: 240 }));
@@ -80,9 +119,7 @@ export function CharacterGreeting({ mood, message, active = false, motion = 'idl
     // 두 PNG를 같은 영역에 유지하고 불투명도만 전환해, 파일 로딩이나 배치 변화 없이 프레임을 교체합니다.
     const showAfter = (delay: number) => withDelay(delay, withTiming(1, { duration: 0 }));
     const hideAfter = (delay: number) => withDelay(delay, withTiming(0, { duration: 0 }));
-    if (mood === 'idle' && motion === 'idle') {
-      frame.value = withRepeat(withSequence(showAfter(5700), hideAfter(115)), -1);
-    } else if (mood === 'welcome' && motion === 'welcome') {
+    if (mood === 'welcome' && motion === 'welcome') {
       frame.value = withSequence(showAfter(125), hideAfter(115), showAfter(120), hideAfter(115));
     } else if (mood === 'cheer' && motion === 'completed') {
       frame.value = withSequence(showAfter(140), hideAfter(150));
@@ -100,10 +137,12 @@ export function CharacterGreeting({ mood, message, active = false, motion = 'idl
   }, [idleMessageTimeout, message, mood, motion, sequence]);
 
   const character = <Animated.View style={[styles.character, animatedStyle]}>
+    <Animated.View style={[styles.character, idleStyle]}>
     {alternate ? <>
       <Animated.Image source={characterImages[mood]} style={[styles.frame, primaryFrame]} resizeMode="contain" accessible={false} />
       <Animated.Image source={alternate} style={[styles.frame, alternateFrame]} resizeMode="contain" accessible={false} />
     </> : <Image source={characterImages[mood]} style={styles.character} resizeMode="contain" accessible={false} />}
+    </Animated.View>
   </Animated.View>;
 
   return (

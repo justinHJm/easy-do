@@ -77,6 +77,17 @@ export default function MyScreen() {
         <View style={styles.section}><Text style={styles.heading}>설정</Text>
           <View style={styles.row}><View style={styles.grow}><Text style={styles.text}>캐릭터 반응</Text><Text style={styles.muted}>할 일을 완료하면 반응해요</Text></View><Switch accessibilityLabel="캐릭터 반응" value={settings.characterReactions !== false} onValueChange={(value) => updateSettings({ characterReactions: value })} trackColor={{ true: '#B9DCC7' }} thumbColor={settings.characterReactions !== false ? Colors.light.primary : '#F4F4F4'} /></View>
           <View style={styles.row}><View style={styles.grow}><Text style={styles.text}>환영 메시지</Text><Text style={styles.muted}>시작할 때 반갑게 인사해요</Text></View><Switch accessibilityLabel="환영 메시지" value={settings.welcomeMessages !== false} onValueChange={(value) => updateSettings({ welcomeMessages: value })} trackColor={{ true: '#B9DCC7' }} thumbColor={settings.welcomeMessages !== false ? Colors.light.primary : '#F4F4F4'} /></View>
+          {Platform.OS === 'android' && (
+            <View style={styles.row}>
+              <View style={styles.grow}>
+                <Text style={styles.text}>위젯 캐릭터 표시</Text>
+                <Text style={styles.muted}>홈 화면 위젯에서 캐릭터를 표시하고 할 일 완료에 반응하도록 합니다.</Text>
+              </View>
+              <Switch accessibilityLabel="위젯 캐릭터 표시" value={settings.widgetCharacter !== false}
+                onValueChange={(value) => updateSettings({ widgetCharacter: value })}
+                trackColor={{ true: '#B9DCC7' }} thumbColor={settings.widgetCharacter !== false ? Colors.light.primary : '#F4F4F4'} />
+            </View>
+          )}
         </View>
         <View style={styles.section}><Text style={styles.heading}>도움말</Text>
           <Pressable accessibilityRole="button" style={styles.row} onPress={openTutorial}><View style={styles.grow}><Text style={styles.text}>튜토리얼 다시 보기</Text><Text style={styles.muted}>easy-do의 기본 사용법을 다시 안내해요</Text></View><Text style={styles.muted}>보기</Text></Pressable>

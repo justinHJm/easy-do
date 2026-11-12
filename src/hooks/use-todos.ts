@@ -71,6 +71,7 @@ export function useTodos() {
     void loadData(new Date().toISOString()).then((stored) => {
       if (!active) return;
       let next = initializeLocalData(stored, new Date().toISOString());
+      const refreshWidget = queued.current.some(({ action }) => action.type === 'settings' && action.changes.widgetCharacter !== undefined);
       for (const { action, now } of queued.current) next = updateData(next, action, now);
       queued.current = [];
       next = rollover(next, dateKey(new Date()));
@@ -84,7 +85,7 @@ export function useTodos() {
       setHydrationState('ready');
       setStorageError(null);
       // 읽기가 성공한 뒤에만 새 구조를 저장합니다. 초기 빈 배열이나 읽기 오류로 원본을 덮어쓰지 않습니다.
-      persist(next);
+      persist(next, refreshWidget);
     }).catch(() => {
       fail('데이터를 불러오지 못했어요. 원본을 보존하고 있어요. 다시 시도해 주세요.');
     });
@@ -167,7 +168,7 @@ export function useTodos() {
 
   function retryStorage() {
     if (resetting.current) return;
-    if (ready.current) persist(current.current);
+    if (ready.current) persist(current.current, true);
     else {
       setHydrationState('loading');
       setStorageError(null);
@@ -200,7 +201,7 @@ export function useTodos() {
     ...data, today, loaded, hydrationState, storageError, retryStorage, tutorialVisible,
     resetAllData,
     updateProfile: (displayName: string, avatar: string) => send({ type: 'profile', displayName, avatar }),
-    updateSettings: (changes: { characterReactions?: boolean; welcomeMessages?: boolean; tutorialCompleted?: boolean }) => send({ type: 'settings', changes }),
+    updateSettings: (changes: Extract<DataAction, { type: 'settings' }>['changes']) => send({ type: 'settings', changes }),
     openTutorial: () => setTutorialVisible(true),
     completeTutorial: () => { setTutorialVisible(false); send({ type: 'settings', changes: { tutorialCompleted: true } }); },
     addTodo: (title: string, priority: TodoPriority = 'none', listId?: number, dueToday = false) => send({ type: 'add', title, priority, listId, dueToday }),

@@ -1,6 +1,6 @@
 'use no memo';
 
-import { FlexWidget, ImageWidget, TextWidget, type WidgetRepresentation } from 'react-native-android-widget';
+import { FlexWidget, ImageWidget, TextWidget, type WidgetInfo, type WidgetRepresentation } from 'react-native-android-widget';
 
 import { dueLabel, localDate } from '@/utils/due-date';
 import { getTodoSummary, prioritySymbols, visibleTodos } from '@/utils/todo-state';
@@ -22,8 +22,15 @@ const darkColors: WidgetColors = {
 };
 
 const refreshIcon = require('../../assets/widgets/refresh-icon.png');
+const characterPeek = require('../../assets/widgets/character-peek.png');
+const characterJump = require('../../assets/widgets/character-jump.png');
 
 export type TodoWidgetMode = 'today' | 'all';
+export type TodoWidgetOptions = {
+  refreshing?: boolean;
+  celebrating?: boolean;
+  size?: Pick<WidgetInfo, 'width' | 'height'>;
+};
 
 export function getTodoWidgetTodos(data: TodoData, today: string, mode: TodoWidgetMode) {
   return getTodoSummary(visibleTodos(data, mode, today)).incompleteTodos;
@@ -37,13 +44,20 @@ export function widgetDueLabel(value: string, today: string) {
   return year === localDate(today).getFullYear() ? compactDate : `${String(year).slice(-2)}/${compactDate}`;
 }
 
-function TodoWidgetContent({ data, today, colors, mode, refreshing }: {
-  data: TodoData; today: string; colors: WidgetColors; mode: TodoWidgetMode; refreshing: boolean;
+function TodoWidgetContent({ data, today, colors, mode, options }: {
+  data: TodoData; today: string; colors: WidgetColors; mode: TodoWidgetMode; options: TodoWidgetOptions;
 }) {
+  const { refreshing = false, celebrating = false, size } = options;
   const incompleteTodos = getTodoWidgetTodos(data, today, mode);
   const todos = incompleteTodos.slice(0, 4);
   const title = mode === 'today' ? '오늘 Todo' : '전체 Todo';
   const emptyText = refreshing ? '새로고침 중이에요...' : mode === 'today' ? '오늘 할 일이 없어요' : '할 일이 없어요';
+  // Keep the full-width Todo rows. Only use space below the last row.
+  const availableHeight = size ? size.height - 72 - Math.max(1, todos.length) * 32 : 0;
+  const characterHeight = Math.floor(Math.min(56, availableHeight, (size?.width ?? 0) / 5));
+  const showCharacter = data.settings.widgetCharacter !== false && (size?.width ?? 0) >= 180 && characterHeight >= 32;
+  // The native ImageWidget scales to the requested bitmap size before drawing.
+  const characterWidth = Math.round(characterHeight * (celebrating ? 330 / 426 : 335 / 217));
 
   return (
     <FlexWidget
@@ -65,7 +79,7 @@ function TodoWidgetContent({ data, today, colors, mode, refreshing }: {
         </FlexWidget>
       </FlexWidget>
       {todos.length === 0 ? (
-        <FlexWidget style={{ flex: 1, justifyContent: 'center' }}>
+        <FlexWidget style={{ ...(showCharacter ? { height: 32 } : { flex: 1 }), justifyContent: 'center' }}>
           <TextWidget text={emptyText} style={{ color: colors.muted, fontSize: 14, textAlign: 'center' }} />
         </FlexWidget>
       ) : todos.map((todo) => {
@@ -83,14 +97,22 @@ function TodoWidgetContent({ data, today, colors, mode, refreshing }: {
           {dueText && <TextWidget text={dueText} truncate="END" maxLines={1} style={{ color: colors.muted, fontSize: 11, marginLeft: 6 }} />}
         </FlexWidget>
       })}
+      {showCharacter && (
+        <FlexWidget style={{ width: 'match_parent', flex: 1, alignItems: 'flex-end', justifyContent: 'flex-end' }}>
+          <ImageWidget image={celebrating ? characterJump : characterPeek}
+            imageWidth={characterWidth} imageHeight={characterHeight}
+            style={{ width: characterWidth, height: characterHeight }}
+            resizeMode="contain" />
+        </FlexWidget>
+      )}
     </FlexWidget>
   );
 }
 
 // Android의 야간 모드에 맞춰 같은 Todo 내용을 두 색상으로 제공합니다.
-export function renderTodoWidget(data: TodoData, today: string, mode: TodoWidgetMode = 'today', { refreshing = false }: { refreshing?: boolean } = {}): WidgetRepresentation {
+export function renderTodoWidget(data: TodoData, today: string, mode: TodoWidgetMode = 'today', options: TodoWidgetOptions = {}): WidgetRepresentation {
   return {
-    light: <TodoWidgetContent data={data} today={today} colors={lightColors} mode={mode} refreshing={refreshing} />,
-    dark: <TodoWidgetContent data={data} today={today} colors={darkColors} mode={mode} refreshing={refreshing} />,
+    light: <TodoWidgetContent data={data} today={today} colors={lightColors} mode={mode} options={options} />,
+    dark: <TodoWidgetContent data={data} today={today} colors={darkColors} mode={mode} options={options} />,
   };
 }

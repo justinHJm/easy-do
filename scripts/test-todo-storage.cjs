@@ -381,7 +381,7 @@ test('느린 저장 순서·실패 복구·손상 데이터 원본 보존', asyn
 });
 
 // 최소 Hook 실행기로 초기 복원·저장·날짜 이벤트 연결을 검사합니다. React 화면 렌더러를 대체하지는 않습니다.
-function harness(storage) {
+function harness(storage, widgetUpdate) {
   const slots = []; let cursor = 0; let effects = []; let clock = now; let foreground;
   const timeouts = new Map(); let nextTimeout = 0;
   const changed = (a, b) => !a || a.length !== b.length || a.some((x, i) => !Object.is(x, b[i]));
@@ -395,10 +395,11 @@ function harness(storage) {
   const { useTodos } = load('src/hooks/use-todos.ts', { react, expo: { isRunningInExpoGo: () => false },
     'react-native': {
       AppState: { addEventListener: (_, fn) => { foreground = fn; return { remove() {} }; } },
-      Platform: { OS: 'ios' },
+      Platform: { OS: widgetUpdate ? 'android' : 'ios' },
       NativeModules: {},
     },
     '@/storage/todo-storage': storage, '@/utils/todo-state': core, '@/utils/due-date': dates,
+    '@/widgets/request-todo-widget-update': { requestTodoWidgetUpdate: widgetUpdate },
   }, { Date: Clock,
     setTimeout: (fn) => { const id = ++nextTimeout; timeouts.set(id, fn); return id; }, clearTimeout: (id) => timeouts.delete(id) });
   return {
@@ -804,6 +805,8 @@ test('Widget modes share rendered Todo selection and isolate refresh actions', (
     '@/utils/due-date': dates,
     '@/utils/todo-state': core,
     '../../assets/widgets/refresh-icon.png': 1,
+    '../../assets/widgets/character-peek.png': 2,
+    '../../assets/widgets/character-jump.png': 3,
     'react/jsx-runtime': { jsx: element, jsxs: element },
   });
   const handler = load('src/widgets/todo-widget-handler.ts', {
@@ -865,6 +868,22 @@ test('Widget modes share rendered Todo selection and isolate refresh actions', (
   assert.equal(handler.isTodoWidgetRefreshAction('WIDGET_CLICK', 'REFRESH_TODOS'), true);
   assert.equal(handler.isTodoWidgetRefreshAction('WIDGET_CLICK', 'TOGGLE_TODO'), false);
   assert.equal(handler.isTodoWidgetRefreshAction('WIDGET_UPDATE', 'REFRESH_TODOS'), false);
+
+  const large = { width: 280, height: 180 };
+  const widgetImages = (state, options, theme) => {
+    nodes.length = 0;
+    visit(widget.renderTodoWidget(state, '2026-09-07', 'all', options)[theme]);
+    return nodes.filter((node) => node.type === 'ImageWidget').map((node) => node.props.image);
+  };
+  assert.deepEqual(widgetImages(data, { size: large }, 'light'), [1, 2]);
+  assert.deepEqual(widgetImages(data, { size: large, celebrating: true }, 'dark'), [1, 3]);
+  assert.deepEqual(widgetImages(data, { size: { width: 180, height: 110 } }, 'light'), [1]);
+  assert.deepEqual(widgetImages({ ...data, settings: { widgetCharacter: false } }, { size: large, celebrating: true }, 'dark'), [1]);
+  const long = { ...data, todos: Array.from({ length: 6 }, (_, index) =>
+    ({ id: index + 1, title: '아주 긴 할 일 '.repeat(12), priority: 'none', completed: false })) };
+  assert.deepEqual(widgetImages(long, { size: large }, 'light'), [1]);
+  assert.equal(nodes.filter((node) => node.props?.clickAction === 'TOGGLE_TODO').length, 4);
+  assert.equal(nodes.find((node) => node.props?.text === long.todos[0].title).props.maxLines, 1);
 });
 
 test('Widget refresh feedback reloads without saving', async () => {
@@ -894,22 +913,147 @@ test('Widget refresh feedback reloads without saving', async () => {
   assert.equal(saveCalls, 0);
 });
 
-test('Widget 완료는 저장 뒤 모든 Todo 위젯을 갱신', async () => {
-  let registered; let updateCalls = 0;
-  const data = { ...core.emptyData(), todos: [{ id: 1, title: 'today', priority: 'none', completed: false, dueDate: '2026-09-07' }] };
+test('Widget 연속 완료는 저장 뒤 전체 갱신, 중복 탭 방지, 최신 반응만 복귀', async () => {
+  let registered; let saves = 0; const frames = []; const timers = [];
+  const { storage } = fixture();
+  let data = reduce(core.emptyData(), { type: 'add', title: '첫 일' });
+  data = reduce(data, { type: 'add', title: '두 번째 일' });
+  data = reduce(data, { type: 'add', title: '세 번째 일' });
+  await storage.saveData(data);
   const handler = load('src/widgets/todo-widget-handler.ts', {
     'react-native-android-widget': { registerWidgetTaskHandler(callback) { registered = callback; } },
-    '@/storage/todo-storage': { loadDataWithDiagnostics: async () => ({ data, rawExists: true, key: newKey }), saveData: async () => {} },
+    '@/storage/todo-storage': { ...storage, saveData: async (next) => { saves++; await storage.saveData(next); } },
     '@/utils/due-date': dates, '@/utils/todo-state': core,
-    '@/widgets/todo-widget': { renderTodoWidget: (renderData, today, mode) => ({ renderData, today, mode }) },
-    '@/widgets/request-todo-widget-update': { requestTodoWidgetUpdate: async () => { updateCalls++; } },
-  }, { __DEV__: false });
+    '@/widgets/todo-widget': { renderTodoWidget: (renderData, today, mode, options) => ({ renderData, today, mode, options }) },
+    '@/widgets/request-todo-widget-update': { requestTodoWidgetUpdate: async () => {
+      frames.push((await handler.loadTodoWidgetRepresentation(new Date().toISOString())).representation);
+    } },
+  }, { __DEV__: false, setTimeout(fn, delay) { assert.ok(delay >= 0 && delay <= 1500); timers.push(fn); } });
   handler.registerTodoWidgetHandler();
-  await registered({
-    widgetInfo: { widgetName: handler.TODO_WIDGET_NAME }, widgetAction: 'WIDGET_CLICK', clickAction: 'TOGGLE_TODO', clickActionData: { id: 1 },
+  const tap = (id) => registered({
+    widgetInfo: { widgetName: handler.TODO_WIDGET_NAME }, widgetAction: 'WIDGET_CLICK', clickAction: 'TOGGLE_TODO',
     renderWidget() {},
+    clickActionData: { id },
   });
-  assert.equal(updateCalls, 1);
+  const first = tap(1);
+  await tick();
+  await tap(1);
+  const second = tap(2);
+  await tick();
+  assert.equal(saves, 2);
+  assert.equal(timers.length, 2);
+  assert.deepEqual(plain(frames.map((f) => f.renderData.todos.filter((todo) => todo.completed).length)), [1, 2]);
+  assert.ok(frames.every((f) => f.options.celebrating));
+  timers.shift()(); await first;
+  assert.equal(frames.length, 2);
+  timers.shift()(); await second;
+  assert.equal(frames.at(-1).options.celebrating, false);
+
+  const stored = await storage.loadData(new Date().toISOString());
+  await storage.saveData(reduce(stored, { type: 'settings', changes: { widgetCharacter: false } }));
+  await tap(3);
+  assert.equal(saves, 3);
+  assert.equal(timers.length, 0);
+  assert.equal(frames.at(-1).renderData.settings.widgetCharacter, false);
+  assert.equal(frames.at(-1).options.celebrating, false);
+});
+
+test('위젯 설정은 이전 저장에서 ON, 변경 저장 뒤 두 종류의 모든 인스턴스를 갱신', async () => {
+  const { storage } = fixture();
+  await storage.saveData(core.emptyData());
+  const painted = [];
+  const updater = load('src/widgets/request-todo-widget-update.ts', {
+    'react-native-android-widget': {
+      getWidgetInfo: async (widgetName) => (widgetName === 'TodoWidget' ? [1, 2] : [3])
+        .map((widgetId) => ({ widgetName, widgetId, width: 280, height: 180 })),
+      async requestWidgetUpdateById({ widgetName, widgetId, renderWidget }) {
+        painted.push([widgetId, await renderWidget({ widgetName, widgetId, width: 280, height: 180 })]);
+      },
+    },
+    '@/utils/due-date': dates, '@/utils/todo-state': core, '@/widgets/todo-widget': {},
+    '@/widgets/todo-widget-handler': {
+      TODO_WIDGET_NAME: 'TodoWidget', ALL_TODO_WIDGET_NAME: 'AllTodoWidget', todoWidgetMode: (name) => name,
+      loadTodoWidgetRepresentation: async (time, mode, { size }) => {
+        assert.equal(size.width, 280);
+        return { representation: (await storage.loadData(time)).settings.widgetCharacter };
+      },
+    },
+  });
+  const h = harness(storage, updater.requestTodoWidgetUpdate);
+  h.render(); await tick();
+  const hook = h.render();
+  assert.equal(hook.settings.widgetCharacter, true);
+  hook.updateSettings({ widgetCharacter: false });
+  await tick();
+  assert.equal((await storage.loadData(now)).settings.widgetCharacter, false);
+  assert.deepEqual(plain(painted.sort((a, b) => a[0] - b[0])), [[1, false], [2, false], [3, false]]);
+  assert.equal(h.render().settings.characterReactions, true);
+  h.unmount();
+});
+
+test('캐릭터 대기 타이머는 한 개만 유지하고 둘러보기 재사용 시간을 지킨다', () => {
+  const timers = new Map(); const actions = []; const gaps = [];
+  let id = 0; let clock = 0; let random = 0;
+  const { scheduleCharacterIdle } = load('src/utils/character-idle.ts', {}, {
+    Date: { now: () => clock }, Math: { random: () => random },
+    setTimeout(fn, delay) { gaps.push(delay); timers.set(++id, fn); return id; },
+    clearTimeout: (timer) => timers.delete(timer),
+  });
+  const advance = (time) => {
+    clock = time;
+    assert.equal(timers.size, 1);
+    const [timer, fn] = [...timers][0];
+    timers.delete(timer); fn();
+  };
+  const stop = scheduleCharacterIdle((action) => actions.push(action));
+  random = 0.2; advance(3000); advance(11000); advance(16000); advance(26000);
+  assert.deepEqual(actions, ['blink', 'lookAround', 'blink', 'lookAround']);
+  assert.notEqual(gaps[0], gaps[1]);
+  stop();
+  assert.equal(timers.size, 0);
+});
+
+test('홈 캐릭터는 완료 뒤 idle로 돌아가고 화면 이탈과 백그라운드에서 타이머를 정리한다', () => {
+  const slots = []; const timers = new Map(); let cursor = 0; let id = 0;
+  let focus; let changeAppState; let removed = false;
+  const { useHomeCharacter } = load('src/hooks/use-home-character.ts', {
+    react: {
+      useCallback: (fn) => fn,
+      useRef: (value) => slots[cursor++] ??= { current: value },
+      useState(initial) {
+        const slot = slots[cursor++] ??= { value: typeof initial === 'function' ? initial() : initial };
+        return [slot.value, (value) => { slot.value = value; }];
+      },
+    },
+    'expo-router': { useFocusEffect: (fn) => { focus = fn; } },
+    'react-native': { AppState: {
+      currentState: 'active',
+      addEventListener(_, fn) { changeAppState = fn; return { remove() { removed = true; } }; },
+    } },
+    '@/constants/character': { randomReaction: () => ({ mood: 'welcome', message: '안녕' }) },
+  }, {
+    setTimeout(fn, delay) { timers.set(++id, { fn, delay }); return id; },
+    clearTimeout: (timer) => timers.delete(timer),
+  });
+  function render() { cursor = 0; return useHomeCharacter(true, true); }
+  render();
+  const blur = focus();
+  assert.equal(render().reaction.motion, 'welcome');
+  render().play('completed', { mood: 'completed', message: '완료' });
+  assert.equal(render().reaction.motion, 'completed');
+  const reactionTimers = [...timers].filter(([, timer]) => timer.delay === 1750);
+  assert.equal(reactionTimers.length, 1);
+  const [reactionId, timer] = reactionTimers[0];
+  timers.delete(reactionId); timer.fn();
+  assert.equal(render().reaction, null);
+  changeAppState('background');
+  assert.equal(render().active, false);
+  assert.equal(timers.size, 0);
+  changeAppState('active');
+  assert.equal(render().reaction.motion, 'welcome');
+  blur();
+  assert.equal(removed, true);
+  assert.equal(timers.size, 0);
 });
 
 test('Hook: 연속 완료·취소는 실제 반영 결과를 반환하고 이전 루틴 회차는 무시', async () => {
