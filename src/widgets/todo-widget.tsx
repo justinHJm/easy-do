@@ -53,7 +53,10 @@ function TodoWidgetContent({ data, today, colors, mode, options }: {
   const title = mode === 'today' ? '오늘 Todo' : '전체 Todo';
   const emptyText = refreshing ? '새로고침 중이에요...' : mode === 'today' ? '오늘 할 일이 없어요' : '할 일이 없어요';
   // Reserve a right column based on widget dimensions, independently of the number of rows.
-  const characterWidth = Math.floor(Math.min(58, Math.max(0, (size?.height ?? 0) - 72) * 330 / 426));
+  const widgetWidth = size?.width ?? 0;
+  const preset = data.settings.widgetCharacterSize;
+  const desiredWidth = preset === 'small' ? 58 : preset === 'large' ? Math.max(82, widgetWidth * 0.3) : Math.max(68, widgetWidth * 0.22);
+  const characterWidth = Math.floor(Math.min(desiredWidth, widgetWidth - 124, Math.max(0, (size?.height ?? 0) - 72) * 330 / 426));
   const showCharacter = data.settings.widgetCharacter !== false && (size?.width ?? 0) >= 180 && characterWidth >= 24;
   const characterHeight = Math.round(characterWidth * (celebrating ? 426 / 330 : 217 / 335));
 
@@ -92,9 +95,9 @@ function TodoWidgetContent({ data, today, colors, mode, options }: {
               <TextWidget text="○" style={{ color: colors.accent, fontSize: 28, marginRight: 8 }} />
               {!!prioritySymbols[todo.priority] && <TextWidget text={prioritySymbols[todo.priority]} style={{ color: '#B52F3B', fontSize: 12, fontWeight: 'bold', marginRight: 6 }} />}
               <FlexWidget style={{ flex: 1 }}>
-                <TextWidget text={todo.title} truncate="END" maxLines={1} style={{ color: colors.text, fontSize: 14 }} />
+                <TextWidget text={dueText ? `${todo.title}  ${dueText}` : todo.title}
+                  truncate={dueText ? 'MIDDLE' : 'END'} maxLines={1} style={{ color: colors.text, fontSize: 14 }} />
               </FlexWidget>
-              {dueText && <TextWidget text={dueText} truncate="END" maxLines={1} style={{ color: colors.muted, fontSize: 11, marginLeft: 6 }} />}
             </FlexWidget>
           })}
         </FlexWidget>

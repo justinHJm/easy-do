@@ -89,14 +89,22 @@ async function handleTodoWidget({ widgetInfo, widgetAction, clickAction, clickAc
       const result = await completeTodo(clickActionData);
       if (result) {
         const { requestTodoWidgetUpdate } = await import('@/widgets/request-todo-widget-update');
-        await requestTodoWidgetUpdate();
         const { reaction } = result;
-        if (reaction && celebration === reaction) {
-          // Keep this one-shot reset inside the library's awaited headless task.
-          await new Promise<void>((resolve) => setTimeout(resolve, Math.max(0, reaction.expiresAt - Date.now())));
-          if (celebration === reaction) {
+        try {
+          await requestTodoWidgetUpdate();
+        } finally {
+          // A partial render failure must not skip resetting widgets already showing the jump.
+          if (reaction && celebration === reaction) {
+            await new Promise<void>((resolve) => setTimeout(resolve, Math.max(0, reaction.expiresAt - Date.now())));
+          }
+          if (reaction && celebration === reaction) {
             celebration = undefined;
-            await requestTodoWidgetUpdate();
+            try {
+              await requestTodoWidgetUpdate();
+            } catch {
+              // Retry once inside the headless task if a native update rejects.
+              await requestTodoWidgetUpdate();
+            }
           }
         }
         return;

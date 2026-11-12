@@ -16,6 +16,7 @@ const FEEDBACK_FORM_URL = 'https://forms.gle/8WgBa7U6EETHXhs18';
 type Avatar = typeof avatars[number];
 const avatarLabels = { idle: '기본', welcome: '인사', completed: '기쁨', cheer: '응원' };
 const priorityLabels = { veryHigh: '매우 높음', high: '높음', medium: '보통', none: '없음' };
+const widgetSizes = [['small', '작게'], ['medium', '보통'], ['large', '크게']] as const;
 
 export default function MyScreen() {
   const data = useTodoContext();
@@ -86,6 +87,21 @@ export default function MyScreen() {
               <Switch accessibilityLabel="위젯 캐릭터 표시" value={settings.widgetCharacter !== false}
                 onValueChange={(value) => updateSettings({ widgetCharacter: value })}
                 trackColor={{ true: '#B9DCC7' }} thumbColor={settings.widgetCharacter !== false ? Colors.light.primary : '#F4F4F4'} />
+            </View>
+          )}
+          {Platform.OS === 'android' && settings.widgetCharacter !== false && (
+            <View style={styles.grow}>
+              <Text style={styles.text}>위젯 캐릭터 크기</Text>
+              <View style={styles.choices}>
+                {widgetSizes.map(([size, label]) => {
+                  const selected = (settings.widgetCharacterSize ?? 'medium') === size;
+                  return <Pressable key={size} accessibilityRole="radio" accessibilityLabel={`위젯 캐릭터 ${label}`}
+                    accessibilityState={{ checked: selected }} style={[styles.choice, selected && styles.selected]}
+                    onPress={() => updateSettings({ widgetCharacterSize: size })}>
+                    <Text style={styles.text}>{label}</Text>
+                  </Pressable>;
+                })}
+              </View>
             </View>
           )}
         </View>

@@ -71,7 +71,8 @@ export function useTodos() {
     void loadData(new Date().toISOString()).then((stored) => {
       if (!active) return;
       let next = initializeLocalData(stored, new Date().toISOString());
-      const refreshWidget = queued.current.some(({ action }) => action.type === 'settings' && action.changes.widgetCharacter !== undefined);
+      const refreshWidget = queued.current.some(({ action }) => action.type === 'settings' &&
+        (action.changes.widgetCharacter !== undefined || action.changes.widgetCharacterSize !== undefined));
       for (const { action, now } of queued.current) next = updateData(next, action, now);
       queued.current = [];
       next = rollover(next, dateKey(new Date()));

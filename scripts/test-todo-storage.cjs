@@ -843,7 +843,7 @@ test('Widget modes share rendered Todo selection and isolate refresh actions', (
   assert.ok(nodes.some((node) => node.props?.text === '전체 Todo'));
   assert.ok(nodes.some((node) => node.props?.text === '할 일 2개'));
   assert.ok(nodes.some((node) => node.props?.text === '!!!'));
-  assert.ok(nodes.some((node) => node.props?.text === '오늘까지'));
+  assert.ok(nodes.some((node) => node.props?.text === 'today  오늘까지' && node.props.truncate === 'MIDDLE'));
   const refresh = nodes.find((node) => node.props?.clickAction === 'REFRESH_TODOS');
   assert.deepEqual(plain({ width: refresh.props.style.width, height: refresh.props.style.height }), { width: 36, height: 36 });
   const rotatingIcon = nodes.find((node) => node.type === 'ImageWidget');
@@ -879,6 +879,11 @@ test('Widget modes share rendered Todo selection and isolate refresh actions', (
   assert.deepEqual(widgetImages(data, { size: large, celebrating: true }, 'dark'), [1, 3]);
   const characterSize = () => nodes.find((node) => [2, 3].includes(node.props?.image)).props.imageWidth;
   const normalWidth = characterSize();
+  widgetImages({ ...data, settings: { widgetCharacterSize: 'small' } }, { size: large }, 'light');
+  assert.equal(characterSize(), 58);
+  assert.ok(normalWidth > 58);
+  widgetImages({ ...data, settings: { widgetCharacterSize: 'large' } }, { size: large }, 'light');
+  assert.ok(characterSize() > normalWidth);
   assert.deepEqual(widgetImages(data, { size: { width: 180, height: 110 } }, 'light'), [1, 2]);
   assert.deepEqual(widgetImages({ ...data, settings: { widgetCharacter: false } }, { size: large, celebrating: true }, 'dark'), [1]);
   const long = { ...data, todos: Array.from({ length: 6 }, (_, index) =>
@@ -922,11 +927,12 @@ test('Widget refresh feedback reloads without saving', async () => {
 });
 
 test('Widget 연속 완료는 저장 뒤 전체 갱신, 중복 탭 방지, 최신 반응만 복귀', async () => {
-  let registered; let saves = 0; const frames = []; const timers = [];
+  let registered; let saves = 0; let failPaint = false; const frames = []; const timers = [];
   const { storage } = fixture();
   let data = reduce(core.emptyData(), { type: 'add', title: '첫 일' });
   data = reduce(data, { type: 'add', title: '두 번째 일' });
   data = reduce(data, { type: 'add', title: '세 번째 일' });
+  data = reduce(data, { type: 'add', title: '네 번째 일' });
   await storage.saveData(data);
   const handler = load('src/widgets/todo-widget-handler.ts', {
     'react-native-android-widget': { registerWidgetTaskHandler(callback) { registered = callback; } },
@@ -935,6 +941,7 @@ test('Widget 연속 완료는 저장 뒤 전체 갱신, 중복 탭 방지, 최�
     '@/widgets/todo-widget': { renderTodoWidget: (renderData, today, mode, options) => ({ renderData, today, mode, options }) },
     '@/widgets/request-todo-widget-update': { requestTodoWidgetUpdate: async () => {
       frames.push((await handler.loadTodoWidgetRepresentation(new Date().toISOString())).representation);
+      if (failPaint) { failPaint = false; throw new Error('Partial render failure'); }
     } },
   }, { __DEV__: false, setTimeout(fn, delay) { assert.ok(delay >= 0 && delay <= 1500); timers.push(fn); } });
   handler.registerTodoWidgetHandler();
@@ -957,10 +964,18 @@ test('Widget 연속 완료는 저장 뒤 전체 갱신, 중복 탭 방지, 최�
   timers.shift()(); await second;
   assert.equal(frames.at(-1).options.celebrating, false);
 
+  failPaint = true;
+  const partial = tap(3);
+  await tick();
+  assert.equal(frames.at(-1).options.celebrating, true);
+  assert.equal(timers.length, 1);
+  timers.shift()(); await partial;
+  assert.equal(frames.at(-1).options.celebrating, false);
+
   const stored = await storage.loadData(new Date().toISOString());
   await storage.saveData(reduce(stored, { type: 'settings', changes: { widgetCharacter: false } }));
-  await tap(3);
-  assert.equal(saves, 3);
+  await tap(4);
+  assert.equal(saves, 4);
   assert.equal(timers.length, 0);
   assert.equal(frames.at(-1).renderData.settings.widgetCharacter, false);
   assert.equal(frames.at(-1).options.celebrating, false);
@@ -983,7 +998,8 @@ test('위젯 설정은 이전 저장에서 ON, 변경 저장 뒤 두 종류의 �
       TODO_WIDGET_NAME: 'TodoWidget', ALL_TODO_WIDGET_NAME: 'AllTodoWidget', todoWidgetMode: (name) => name,
       loadTodoWidgetRepresentation: async (time, mode, { size }) => {
         assert.equal(size.width, 280);
-        return { representation: (await storage.loadData(time)).settings.widgetCharacter };
+        const settings = (await storage.loadData(time)).settings;
+        return { representation: [settings.widgetCharacter, settings.widgetCharacterSize] };
       },
     },
   });
@@ -991,10 +1007,15 @@ test('위젯 설정은 이전 저장에서 ON, 변경 저장 뒤 두 종류의 �
   h.render(); await tick();
   const hook = h.render();
   assert.equal(hook.settings.widgetCharacter, true);
+  assert.equal(hook.settings.widgetCharacterSize, 'medium');
+  hook.updateSettings({ widgetCharacterSize: 'large' });
+  await tick();
+  assert.deepEqual(plain(painted.sort((a, b) => a[0] - b[0])), [[1, [true, 'large']], [2, [true, 'large']], [3, [true, 'large']]]);
+  painted.length = 0;
   hook.updateSettings({ widgetCharacter: false });
   await tick();
   assert.equal((await storage.loadData(now)).settings.widgetCharacter, false);
-  assert.deepEqual(plain(painted.sort((a, b) => a[0] - b[0])), [[1, false], [2, false], [3, false]]);
+  assert.deepEqual(plain(painted.sort((a, b) => a[0] - b[0])), [[1, [false, 'large']], [2, [false, 'large']], [3, [false, 'large']]]);
   assert.equal(h.render().settings.characterReactions, true);
   h.unmount();
 });

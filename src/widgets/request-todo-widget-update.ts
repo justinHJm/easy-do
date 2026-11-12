@@ -10,8 +10,8 @@ let pendingUpdate: Promise<void> = Promise.resolve();
 export function requestTodoWidgetUpdate() {
   // The library's bulk API returns before its async render callbacks complete.
   const update = pendingUpdate.then(async () => {
-    const groups = await Promise.all([TODO_WIDGET_NAME, ALL_TODO_WIDGET_NAME].map(getWidgetInfo));
-    const widgets = groups.flat();
+    const groups = await Promise.allSettled([TODO_WIDGET_NAME, ALL_TODO_WIDGET_NAME].map(getWidgetInfo));
+    const widgets = groups.flatMap((group) => group.status === 'fulfilled' ? group.value : []);
     const results = await Promise.allSettled(widgets.map(({ widgetName, widgetId }) => requestWidgetUpdateById({
       widgetName, widgetId,
       renderWidget: async (widgetInfo) => {
@@ -25,7 +25,7 @@ export function requestTodoWidgetUpdate() {
         }
       },
     })));
-    const failed = results.find((result) => result.status === 'rejected');
+    const failed = [...groups, ...results].find((result) => result.status === 'rejected');
     if (failed) throw failed.reason;
   });
   pendingUpdate = update.catch(() => {});
