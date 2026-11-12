@@ -52,12 +52,10 @@ function TodoWidgetContent({ data, today, colors, mode, options }: {
   const todos = incompleteTodos.slice(0, 4);
   const title = mode === 'today' ? '오늘 Todo' : '전체 Todo';
   const emptyText = refreshing ? '새로고침 중이에요...' : mode === 'today' ? '오늘 할 일이 없어요' : '할 일이 없어요';
-  // Keep the full-width Todo rows. Only use space below the last row.
-  const availableHeight = size ? size.height - 72 - Math.max(1, todos.length) * 32 : 0;
-  const characterHeight = Math.floor(Math.min(56, availableHeight, (size?.width ?? 0) / 5));
-  const showCharacter = data.settings.widgetCharacter !== false && (size?.width ?? 0) >= 180 && characterHeight >= 32;
-  // The native ImageWidget scales to the requested bitmap size before drawing.
-  const characterWidth = Math.round(characterHeight * (celebrating ? 330 / 426 : 335 / 217));
+  // Reserve a right column based on widget dimensions, independently of the number of rows.
+  const characterWidth = Math.floor(Math.min(58, Math.max(0, (size?.height ?? 0) - 72) * 330 / 426));
+  const showCharacter = data.settings.widgetCharacter !== false && (size?.width ?? 0) >= 180 && characterWidth >= 24;
+  const characterHeight = Math.round(characterWidth * (celebrating ? 426 / 330 : 217 / 335));
 
   return (
     <FlexWidget
@@ -78,33 +76,37 @@ function TodoWidgetContent({ data, today, colors, mode, options }: {
           </FlexWidget>
         </FlexWidget>
       </FlexWidget>
-      {todos.length === 0 ? (
-        <FlexWidget style={{ ...(showCharacter ? { height: 32 } : { flex: 1 }), justifyContent: 'center' }}>
-          <TextWidget text={emptyText} style={{ color: colors.muted, fontSize: 14, textAlign: 'center' }} />
+      <FlexWidget style={{ width: 'match_parent', flex: 1, flexDirection: 'row' }}>
+        <FlexWidget style={{ flex: 1 }}>
+          {todos.length === 0 ? (
+            <FlexWidget style={{ flex: 1, justifyContent: 'center' }}>
+              <TextWidget text={emptyText} style={{ color: colors.muted, fontSize: 14, textAlign: 'center' }} />
+            </FlexWidget>
+          ) : todos.map((todo) => {
+            const dueText = mode === 'all' && todo.dueDate ? widgetDueLabel(todo.dueDate, today) : undefined;
+            return <FlexWidget key={`${todo.id}-${todo.occurrenceDate ?? ''}`}
+                clickAction="TOGGLE_TODO"
+                clickActionData={todo.recurrence ? { id: todo.id, occurrenceDate: todo.occurrenceDate } : { id: todo.id }}
+                accessibilityLabel={`${todo.title} 완료`}
+                style={{ width: 'match_parent', height: 32, flexDirection: 'row', alignItems: 'center' }}>
+              <TextWidget text="○" style={{ color: colors.accent, fontSize: 28, marginRight: 8 }} />
+              {!!prioritySymbols[todo.priority] && <TextWidget text={prioritySymbols[todo.priority]} style={{ color: '#B52F3B', fontSize: 12, fontWeight: 'bold', marginRight: 6 }} />}
+              <FlexWidget style={{ flex: 1 }}>
+                <TextWidget text={todo.title} truncate="END" maxLines={1} style={{ color: colors.text, fontSize: 14 }} />
+              </FlexWidget>
+              {dueText && <TextWidget text={dueText} truncate="END" maxLines={1} style={{ color: colors.muted, fontSize: 11, marginLeft: 6 }} />}
+            </FlexWidget>
+          })}
         </FlexWidget>
-      ) : todos.map((todo) => {
-        const dueText = mode === 'all' && todo.dueDate ? widgetDueLabel(todo.dueDate, today) : undefined;
-        return <FlexWidget key={`${todo.id}-${todo.occurrenceDate ?? ''}`} style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
-          <TextWidget
-            text="○"
-            clickAction="TOGGLE_TODO"
-            clickActionData={todo.recurrence ? { id: todo.id, occurrenceDate: todo.occurrenceDate } : { id: todo.id }}
-            style={{ color: colors.accent, fontSize: 22, marginRight: 8 }} />
-          {!!prioritySymbols[todo.priority] && <TextWidget text={prioritySymbols[todo.priority]} style={{ color: '#B52F3B', fontSize: 12, fontWeight: 'bold', marginRight: 6 }} />}
-          <FlexWidget style={{ flex: 1 }}>
-            <TextWidget text={todo.title} truncate="END" maxLines={1} style={{ color: colors.text, fontSize: 14 }} />
+        {showCharacter && (
+          <FlexWidget style={{ width: characterWidth, height: 'match_parent', marginLeft: 6, alignItems: 'flex-end', justifyContent: 'flex-end' }}>
+            <ImageWidget image={celebrating ? characterJump : characterPeek}
+              imageWidth={characterWidth} imageHeight={characterHeight}
+              style={{ width: characterWidth, height: characterHeight }}
+              resizeMode="contain" />
           </FlexWidget>
-          {dueText && <TextWidget text={dueText} truncate="END" maxLines={1} style={{ color: colors.muted, fontSize: 11, marginLeft: 6 }} />}
-        </FlexWidget>
-      })}
-      {showCharacter && (
-        <FlexWidget style={{ width: 'match_parent', flex: 1, alignItems: 'flex-end', justifyContent: 'flex-end' }}>
-          <ImageWidget image={celebrating ? characterJump : characterPeek}
-            imageWidth={characterWidth} imageHeight={characterHeight}
-            style={{ width: characterWidth, height: characterHeight }}
-            resizeMode="contain" />
-        </FlexWidget>
-      )}
+        )}
+      </FlexWidget>
     </FlexWidget>
   );
 }

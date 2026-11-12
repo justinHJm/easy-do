@@ -39,3 +39,8 @@ Git diff만으로 알기 어려운 변경 목적, 문제 원인, 실패 시도, 
 - 깨끗한 체크아웃에서도 TypeScript가 Expo CSS 타입을 읽도록 타입 참조를 추가했다.
 - 타입 검사, 저장·날짜·Widget 로직 테스트 44개(서울·뉴욕 각각), 버전·일반/QA Expo 설정, Android export와 QA prebuild를 확인했다.
 - 기존 Actions QA APK 빌드 기록을 확인했다. Android 실기기 QA와 정식 배포는 남아 있다.
+
+### v0.4.1 위젯 완료 터치 영역 및 캐릭터 크기
+
+- 위젯 오른쪽에 별도 캐릭터 영역을 확보해 Todo 개수와 포즈에 관계없이 너비를 유지한다. 원을 키우고 Todo 행 전체에 기존 완료 동작을 연결했다. 앱 캐릭터 프레임은 72dp에서 88dp로 키웠다.
+- TypeScript, 서울·뉴욕 각 51개 테스트, 정식·QA Expo 설정 및 QA Android Hermes export 통과. 수정본 APK 및 실기기는 미검증이다.

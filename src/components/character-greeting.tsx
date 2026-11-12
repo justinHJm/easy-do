@@ -7,6 +7,8 @@ import { Colors } from '@/constants/theme';
 import type { CharacterMotion } from '@/hooks/use-home-character';
 import { scheduleCharacterIdle } from '@/utils/character-idle';
 
+const CHARACTER_SIZE = 88;
+
 type Props = CharacterReaction & {
   active?: boolean;
   motion?: CharacterMotion;
@@ -31,8 +33,8 @@ export function CharacterGreeting({ mood, message, active = false, motion = 'idl
     transform: [{ translateX: horizontal ? offset.value : 0 }, { translateY: horizontal ? 0 : offset.value }],
   }), [horizontal, offset]);
   const idleStyle = useAnimatedStyle(() => ({
-    // The visible feet are at y≈62 in the padded 72px frame.
-    transformOrigin: [36, 62, 0],
+    // Anchor at the visible feet inside the transparent frame.
+    transformOrigin: [CHARACTER_SIZE / 2, CHARACTER_SIZE * 62 / 72, 0],
     transform: [
       { rotate: `${lean.value}deg` },
       { scaleX: 1 + breath.value * 0.009 },
@@ -158,9 +160,9 @@ export function CharacterGreeting({ mood, message, active = false, motion = 'idl
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', height: 88, paddingHorizontal: 16 },
-  character: { width: 72, height: 72 },
-  frame: { ...StyleSheet.absoluteFill, width: 72, height: 72 },
+  row: { flexDirection: 'row', alignItems: 'center', height: 92, paddingHorizontal: 16 },
+  character: { width: CHARACTER_SIZE, height: CHARACTER_SIZE },
+  frame: { ...StyleSheet.absoluteFill, width: CHARACTER_SIZE, height: CHARACTER_SIZE },
   // 에셋의 투명 여백과 왼쪽 아래 꼬리를 피해 텍스트를 말풍선 몸통 안에 배치합니다.
   bubble: { flex: 1, maxWidth: 260, height: 88, justifyContent: 'center',
     paddingHorizontal: 32, paddingTop: 10, paddingBottom: 18 },

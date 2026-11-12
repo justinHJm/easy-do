@@ -877,12 +877,20 @@ test('Widget modes share rendered Todo selection and isolate refresh actions', (
   };
   assert.deepEqual(widgetImages(data, { size: large }, 'light'), [1, 2]);
   assert.deepEqual(widgetImages(data, { size: large, celebrating: true }, 'dark'), [1, 3]);
-  assert.deepEqual(widgetImages(data, { size: { width: 180, height: 110 } }, 'light'), [1]);
+  const characterSize = () => nodes.find((node) => [2, 3].includes(node.props?.image)).props.imageWidth;
+  const normalWidth = characterSize();
+  assert.deepEqual(widgetImages(data, { size: { width: 180, height: 110 } }, 'light'), [1, 2]);
   assert.deepEqual(widgetImages({ ...data, settings: { widgetCharacter: false } }, { size: large, celebrating: true }, 'dark'), [1]);
   const long = { ...data, todos: Array.from({ length: 6 }, (_, index) =>
     ({ id: index + 1, title: '아주 긴 할 일 '.repeat(12), priority: 'none', completed: false })) };
-  assert.deepEqual(widgetImages(long, { size: large }, 'light'), [1]);
-  assert.equal(nodes.filter((node) => node.props?.clickAction === 'TOGGLE_TODO').length, 4);
+  for (const count of [2, 3, 4, 6]) {
+    assert.deepEqual(widgetImages({ ...long, todos: long.todos.slice(0, count) }, { size: large }, 'light'), [1, 2]);
+    assert.equal(characterSize(), normalWidth);
+  }
+  const rows = nodes.filter((node) => node.props?.clickAction === 'TOGGLE_TODO');
+  assert.equal(rows.length, 4);
+  assert.ok(rows.every((node) => node.type === 'FlexWidget' && node.props.style.width === 'match_parent'));
+  assert.ok(nodes.some((node) => node.props?.text === '○' && node.props.style.fontSize === 28));
   assert.equal(nodes.find((node) => node.props?.text === long.todos[0].title).props.maxLines, 1);
 });
 
