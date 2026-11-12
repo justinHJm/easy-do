@@ -70,8 +70,13 @@ export function getStatistics(data: TodoData, today: string) {
     if (!todo.recurrence) continue;
     const group = { todoId: todo.id, title: todo.title, archived: false, dates: new Map<string, boolean>() };
     routineGroups.set(todo.id, group);
+    // 이번 주 시작한 주간 루틴도 월~일 전체 요일을 표시합니다.
+    // 홈의 실제 시작일과 완료 가능한 회차는 바꾸지 않습니다.
+    const rule = todo.recurrence.type === 'weekly'
+      && todo.recurrence.startDate >= weekStart && todo.recurrence.startDate <= today
+      ? { ...todo.recurrence, startDate: weekStart } : todo.recurrence;
     for (const day of weekDates) {
-      if (nextOccurrence(todo.recurrence, day) === day) group.dates.set(day, false);
+      if (nextOccurrence(rule, day) === day) group.dates.set(day, false);
     }
   }
   for (const completion of data.completions) {

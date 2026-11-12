@@ -392,7 +392,7 @@ function harness(storage) {
     useEffect(fn, deps) { const i = cursor++; if (changed(slots[i]?.deps, deps)) { const old = slots[i]; slots[i] = { deps }; effects.push(() => { old?.cleanup?.(); slots[i].cleanup = fn(); }); } },
   };
   class Clock extends Date { constructor(...args) { super(...(args.length ? args : [clock])); } }
-  const { useTodos } = load('src/hooks/use-todos.ts', { react,
+  const { useTodos } = load('src/hooks/use-todos.ts', { react, expo: { isRunningInExpoGo: () => false },
     'react-native': {
       AppState: { addEventListener: (_, fn) => { foreground = fn; return { remove() {} }; } },
       Platform: { OS: 'ios' },
@@ -612,6 +612,8 @@ test('홈 빠른 추가: 오늘 보기만 자동 기한, 다른 보기·리스�
     '@/components/todo-editor': { TodoEditor: 'TodoEditor' },
     '@/components/todo-views': { TodoViews: 'TodoViews', ListManager: 'ListManager', viewLabels: {} },
     '@/contexts/todo-context': { useTodoContext: () => data }, '@/utils/due-date': dates,
+    '@/hooks/use-home-character': { useHomeCharacter: () => ({ reaction: null }) },
+    '@/utils/todo-state': core,
   });
   function render() { cursor = 0; return treeNodes(HomeScreen()); }
   for (const view of ['today', 'all', 'week', 'urgent', 'routine', 'list:1']) {
@@ -908,6 +910,136 @@ test('Widget 완료는 저장 뒤 모든 Todo 위젯을 갱신', async () => {
     renderWidget() {},
   });
   assert.equal(updateCalls, 1);
+});
+
+test('Hook: 연속 완료·취소는 실제 반영 결과를 반환하고 이전 루틴 회차는 무시', async () => {
+  let stored = reduce(core.emptyData(), { type: 'add', title: '오늘', dueToday: true });
+  stored = reduce(stored, { type: 'add', title: '루틴' });
+  stored = reduce(stored, { type: 'edit', id: 2, changes: {
+    title: '루틴', priority: 'none', recurrence: { type: 'daily', startDate: '2026-09-07' },
+  } });
+  const h = harness({ loadData: async () => stored, saveData: async (data) => { stored = data; } });
+  h.render();
+  await tick();
+  const hook = h.render();
+  const complete = hook.toggleTodo(1);
+  assert.equal(complete.today, '2026-09-07');
+  assert.equal(complete.data.todos[0].completed, true);
+  assert.equal(hook.toggleTodo(1).data.todos[0].completed, false);
+  assert.equal(hook.toggleTodo(2, '2026-09-06'), undefined);
+  assert.equal(hook.toggleTodo(2, '2026-09-07').data.completions[0].occurrenceDate, '2026-09-07');
+  h.unmount();
+});
+
+test('통계 화면: 막대 최소 최대값 5와 자동 확장, 루틴 3개 접기·펼치기', () => {
+  const jsx = (type, props) => ({ type, props });
+  let slot = 0;
+  let counts = [0, 1, 2, 3, 0, 0, 5];
+  const state = [];
+  const day = '2026-09-07';
+  const routineItems = Array.from({ length: 4 }, (_, i) => ({
+    todoId: i + 1, title: '루틴 ' + (i + 1), completed: 1, scheduled: 2, archived: i === 3,
+    occurrences: [{ date: day, completed: true }],
+  }));
+  const { default: Stats } = load('src/app/stats.tsx', {
+    'react/jsx-runtime': { jsx, jsxs: jsx },
+    'expo-router': { useFocusEffect() {} },
+    react: {
+      useCallback: (fn) => fn, useRef: (current) => ({ current }),
+      useState(value) {
+        const index = slot++;
+        if (!(index in state)) state[index] = value;
+        return [state[index], (next) => { state[index] = next(state[index]); }];
+      },
+    },
+    'react-native': { Pressable: 'Pressable', ScrollView: 'ScrollView', Text: 'Text', View: 'View',
+      StyleSheet: { create: (styles) => styles, hairlineWidth: 1 } },
+    'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' },
+    '@/components/character-greeting': { CharacterGreeting: 'CharacterGreeting' },
+    '@/constants/theme': { Colors: { light: {} }, Spacing: {} },
+    '@/contexts/todo-context': { useTodoContext: () => ({ loaded: true, today: day }) },
+    '@/utils/due-date': dates,
+    '@/utils/todo-statistics': { getStatistics: () => ({
+      total: 1, todayCount: counts.at(-1), weekCount: counts.at(-1), weekStart: day, weekEnd: day,
+      lastSevenDays: counts.map((count, i) => ({ date: dates.addDays(day, i - 6), count })),
+      routines: { completed: 4, scheduled: 8, rate: 50, items: routineItems },
+      todos: { todayCompleted: 0, weekCompleted: 0, totalCompleted: 0, pending: 0, overdue: 0 },
+    }) },
+  });
+  function flatten(node) {
+    if (Array.isArray(node)) return node.flatMap(flatten);
+    return node && typeof node === 'object' ? [node, ...flatten(node.props?.children)] : [];
+  }
+  const render = () => { slot = 0; return flatten(Stats()); };
+  const barHeights = (nodes) => nodes.filter((node) =>
+    Array.isArray(node.props.style) && node.props.style.some((style) => style?.borderTopLeftRadius === 5))
+    .map(({ props }) => Number(props.style[1].height.toFixed(1)));
+  const button = (nodes) => nodes.find((node) => node.type === 'Pressable' && node.props.accessibilityState?.expanded !== undefined);
+  const routineCount = (nodes) => nodes.filter((node) => node.props?.style?.borderTopWidth !== undefined &&
+    node.props.style.paddingTop === 8).length;
+
+  let screen = render();
+  assert.deepEqual(barHeights(screen), [18.4, 36.8, 55.2, 92]);
+  assert.equal(routineCount(screen), 3);
+  button(screen).props.onPress();
+  screen = render();
+  assert.equal(routineCount(screen), 4);
+  button(screen).props.onPress();
+  counts = [0, 1, 0, 0, 0, 0, 10];
+  screen = render();
+  assert.deepEqual(barHeights(screen), [9.2, 92]);
+  assert.equal(routineCount(screen), 3);
+});
+
+test('진입점: Expo Go에서는 Widget 로딩을 건너뛰고 네이티브 Android에서 등록', () => {
+  for (const [platform, expoGo, expected] of [
+    ['android', true, ['router']],
+    ['android', false, ['widget', 'router']],
+    ['ios', false, ['router']],
+  ]) {
+    const events = [];
+    load('index.ts', {
+      expo: { isRunningInExpoGo: () => expoGo },
+      'react-native': { Platform: { OS: platform } },
+      get '@/widgets/todo-widget-handler'() {
+        assert.equal(platform, 'android');
+        assert.equal(expoGo, false);
+        return { registerTodoWidgetHandler: () => events.push('widget') };
+      },
+      get 'expo-router/entry'() {
+        events.push('router');
+        return {};
+      },
+    });
+    assert.deepEqual(events, expected);
+  }
+});
+
+test('주간 루틴: 수요일 시작도 화·목 2회 표시, 놓친 화요일은 빈 칸 유지', () => {
+  const todo = { id: 1, title: '화목', completed: false, priority: 'none',
+    recurrence: { type: 'weekly', startDate: '2026-11-11', weekdays: [2, 4] } };
+  const data = { ...core.emptyData(), todos: [todo], nextId: 2 };
+  const before = JSON.stringify(data);
+  let result = stats.getStatistics(data, '2026-11-11').routines;
+  assert.equal(result.scheduled, 2);
+  assert.deepEqual(plain(result.items[0].occurrences), [
+    { date: '2026-11-10', completed: false }, { date: '2026-11-12', completed: false },
+  ]);
+  assert.equal(JSON.stringify(data), before);
+  assert.equal(core.nextOccurrence(todo.recurrence, '2026-11-10'), '2026-11-12');
+
+  const completed = reduce(data, { type: 'toggle', id: 1, occurrenceDate: '2026-11-12' },
+    new Date(2026, 10, 12, 12).toISOString());
+  result = stats.getStatistics(completed, '2026-11-12').routines;
+  assert.deepEqual(plain(result.items[0].occurrences.map(({completed}) => completed)), [false, true]);
+  assert.equal(result.completed, 1);
+  assert.equal(result.rate, 50);
+  assert.deepEqual(plain(stats.getStatistics(completed, '2026-11-18').routines.items[0].occurrences), [
+    { date: '2026-11-17', completed: false }, { date: '2026-11-19', completed: false },
+  ]);
+  const ended = { ...data, todos: [{ ...todo, recurrence: { ...todo.recurrence, endDate: '2026-11-11' } }] };
+  assert.equal(stats.getStatistics(ended, '2026-11-11').routines.scheduled, 1);
+  assert.equal(stats.getStatistics(ended, '2026-11-18').routines.scheduled, 0);
 });
 
 (async () => {

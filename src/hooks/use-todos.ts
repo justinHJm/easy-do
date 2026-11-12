@@ -1,5 +1,6 @@
+import { isRunningInExpoGo } from 'expo';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState, NativeModules, Platform } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import { loadData, saveData, resetStoredData } from '@/storage/todo-storage';
 import { emptyData, initializeLocalData, getTodoSummary, rollover, updateData, visibleTodos, type DataAction } from '@/utils/todo-state';
 import { dateKey } from '@/utils/due-date';
@@ -10,7 +11,7 @@ export const HYDRATION_TIMEOUT_MS = 15000;
 
 function refreshTodoWidget() {
   // Expo Go에는 위젯 네이티브 모듈이 없으므로 호출하지 않습니다.
-  if (Platform.OS !== 'android' || NativeModules.ExponentConstants?.executionEnvironment === 'storeClient') return;
+  if (Platform.OS !== 'android' || isRunningInExpoGo()) return;
   // 앱 실행 환경에서만 위젯 모듈을 불러와 기존 저장소 단위 검사를 유지합니다.
   void import('@/widgets/request-todo-widget-update')
     .then(({ requestTodoWidgetUpdate }) => requestTodoWidgetUpdate())
@@ -90,11 +91,12 @@ export function useTodos() {
     return () => { active = false; clearTimeout(timeout); };
   }, [reload, persist]);
 
-  const send = useCallback((action: DataAction) => {
+  const applyAction = useCallback((action: DataAction) => {
     if (resetting.current) return;
     const now = new Date().toISOString();
     // 자정 직후 타이머보다 먼저 입력하더라도 현재 날짜에 맞는 목록을 보여줍니다.
-    setToday(dateKey(new Date(now)));
+    const actionDay = dateKey(new Date(now));
+    setToday(actionDay);
     if (!ready.current) {
       if (action.type !== 'day') queued.current.push({ action, now });
       return;
@@ -105,6 +107,7 @@ export function useTodos() {
       current.current = next;
       setData(next);
       persist(next, true);
+      return { data: next, today: actionDay };
     }
   }, [persist]);
 
@@ -191,6 +194,8 @@ export function useTodos() {
     } finally { resetting.current = false; }
   }
 
+  const send = (action: DataAction) => { applyAction(action); };
+
   return {
     ...data, today, loaded, hydrationState, storageError, retryStorage, tutorialVisible,
     resetAllData,
@@ -201,7 +206,7 @@ export function useTodos() {
     addTodo: (title: string, priority: TodoPriority = 'none', listId?: number, dueToday = false) => send({ type: 'add', title, priority, listId, dueToday }),
     editTodo: (id: number, changes: TodoEdits) => send({ type: 'edit', id, changes }),
     deleteTodo: (id: number) => send({ type: 'delete', id }),
-    toggleTodo: (id: number, occurrenceDate?: string) => send({ type: 'toggle', id, occurrenceDate }),
+    toggleTodo: (id: number, occurrenceDate?: string) => applyAction({ type: 'toggle', id, occurrenceDate }),
     addList: (name: string) => send({ type: 'list-add', name }),
     renameList: (id: number, name: string) => send({ type: 'list-rename', id, name }),
     deleteList: (id: number) => send({ type: 'list-delete', id }),

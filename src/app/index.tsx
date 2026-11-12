@@ -1,9 +1,9 @@
-﻿import { useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, SectionList, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useEffect, useRef } from 'react';
 import { CharacterGreeting } from '@/components/character-greeting';
-import { CHARACTER_REACTION_MS, characterMessages, randomReaction } from '@/constants/character';
+import { randomReaction, restingReaction } from '@/constants/character';
+import { useHomeCharacter } from '@/hooks/use-home-character';
 
 import { TodoInput } from '@/components/todo-input';
 import { TodoItem } from '@/components/todo-item';
@@ -11,9 +11,9 @@ import { Colors } from '@/constants/theme';
 import { useTodoContext } from '@/contexts/todo-context';
 import { TodoEditor } from '@/components/todo-editor';
 import type { TodoView } from '@/types/todo';
-import { AppState } from 'react-native';
 import { ListManager, TodoViews, viewLabels } from '@/components/todo-views';
 import { localDate } from '@/utils/due-date';
+import { visibleTodos } from '@/utils/todo-state';
 
 const colors = Colors.light;
 
@@ -37,35 +37,30 @@ export default function HomeScreen() {
   }, [activeView, view]);
   // 접기 여부는 화면만의 useState로 관리합니다. 목록을 접어도 Context의 완료 데이터는 삭제되지 않습니다.
   const [showCompleted, setShowCompleted] = useState(true);
-  const [reaction, setReaction] = useState<ReturnType<typeof randomReaction> | null>(() => welcomeEnabled ? randomReaction('welcome', displayName) : null);
-  const reactionTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // 화면이 사라지면 예약된 반응도 취소해, 더 이상 표시되지 않는 화면의 상태를 바꾸지 않습니다.
-  useEffect(() => {
-    // 다른 탭에서 설정을 바꾸면 예약된 칭찬도 취소합니다. OFF인 환영 문구가 다시 나타나지 않게 합니다.
-    if (reactionTimer.current !== null) clearTimeout(reactionTimer.current);
-    setReaction(welcomeEnabled ? randomReaction('welcome', displayName) : null);
-    const subscription = AppState.addEventListener('change', (state) => {
-      if (state !== 'active') return;
-      if (reactionTimer.current !== null) clearTimeout(reactionTimer.current);
-      setReaction(welcomeEnabled ? randomReaction('welcome', displayName) : null);
-    });
-    return () => { subscription.remove(); if (reactionTimer.current !== null) clearTimeout(reactionTimer.current); };
-  }, [welcomeEnabled, reactionsEnabled, displayName, profile.localProfileId]);
+  const { reaction, active: characterActive, hour, play } = useHomeCharacter(welcomeEnabled, reactionsEnabled, displayName);
+  const pending = reactionsEnabled ? (activeView === 'all' ? incompleteTodos : getView('all').incompleteTodos) : [];
+  const resting = reactionsEnabled
+    ? restingReaction(hour, todos.length > 0, pending.length > 0,
+      pending.some((todo) => todo.dueDate !== undefined && todo.dueDate < today))
+    : { mood: 'idle' as const, message: '하나씩 해봐요!' };
 
   function handleToggleTodo(id: number, occurrenceDate?: string) {
-    // 사용자의 완료 동작만 확인하므로 저장 데이터를 불러오거나 완료를 취소할 때는 칭찬하지 않습니다.
-    const isCompleting = incompleteTodos.some((todo) => todo.id === id);
-    toggleTodo(id, occurrenceDate);
-    if (!isCompleting || !reactionsEnabled) return;
+    const result = toggleTodo(id, occurrenceDate);
+    if (!reactionsEnabled || !result) return;
 
-    // 연속으로 완료하면 이전 타이머를 취소하고 마지막 완료부터 1.5초 동안 반응을 유지합니다.
-    if (reactionTimer.current !== null) clearTimeout(reactionTimer.current);
-    setReaction(randomReaction('completed'));
-    reactionTimer.current = setTimeout(() => {
-      setReaction(welcomeEnabled ? { mood: 'idle', message: characterMessages.idle } : null);
-      reactionTimer.current = null;
-    }, CHARACTER_REACTION_MS);
+    // 처리 직후 원본을 읽어 연속 입력·완료 취소·자정의 이전 회차가 축하로 이어지지 않게 합니다.
+    const completed = visibleTodos(result.data, 'all', result.today).find((todo) =>
+      todo.id === id && todo.occurrenceDate === occurrenceDate && todo.completed);
+    if (!completed) return;
+
+    const allTodayDone = completed.dueDate === result.today
+      && visibleTodos(result.data, 'today', result.today).every((todo) => todo.completed);
+    if (allTodayDone) {
+      play('celebrate', { mood: 'celebrate', message: '오늘 할 일을 모두 해냈어요!' });
+    } else {
+      play('completed', randomReaction('completed'));
+    }
   }
   const percent = Math.round(completionRate);
   // SectionList에 미완료·완료 구역을 전달합니다. 접힌 완료 구역은 표시용 배열만 비워 진행률을 유지합니다.
@@ -95,7 +90,10 @@ export default function HomeScreen() {
             <View style={[styles.progress, { width: `${completionRate}%` }]} />
           </View>
         </View>
-        {reaction && <CharacterGreeting {...reaction} />}
+        {(welcomeEnabled || reactionsEnabled) && <CharacterGreeting {...(reaction ?? resting)}
+          active={characterActive && reactionsEnabled}
+          idleMessageTimeout={characterActive ? 1250 : 0}
+          onPress={reactionsEnabled ? () => play('touch', { mood: 'surprised', message: '앗, 반가워요!' }) : undefined} />}
         {storageError && <Pressable accessibilityRole="button" onPress={retryStorage} style={styles.storageNotice}>
           <Text style={styles.error}>{storageError} · 다시 시도</Text>
         </Pressable>}
@@ -154,7 +152,7 @@ const styles = StyleSheet.create({
   track: { height: 5, borderRadius: 3, backgroundColor: colors.backgroundSelected, overflow: 'hidden' },
   progress: { height: '100%', backgroundColor: colors.primary },
   list: { flex: 1 },
-  listContent: { paddingHorizontal: 16, paddingBottom: 24 },
+  listContent: { paddingHorizontal: 16, paddingBottom: 16 },
   pendingTitle: { paddingVertical: 10, fontSize: 14, fontWeight: '600', color: colors.text },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 48, marginTop: 12 },
   sectionTitle: { fontSize: 14, fontWeight: '600', color: colors.textSecondary },

@@ -124,7 +124,7 @@ export default function MyScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: Colors.light.background },
-  content: { padding: 20, gap: 20, paddingBottom: 32, width: '100%', maxWidth: 640, alignSelf: 'center' },
+  content: { padding: 20, gap: 20, paddingBottom: 24, width: '100%', maxWidth: 640, alignSelf: 'center' },
   title: { fontSize: 22, fontWeight: '700', color: Colors.light.text },
   heading: { fontSize: 17, fontWeight: '700', color: Colors.light.text, flexShrink: 1 },
   text: { fontSize: 15, color: Colors.light.text, flexShrink: 1 },

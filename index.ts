@@ -1,6 +1,10 @@
-import { registerTodoWidgetHandler } from '@/widgets/todo-widget-handler';
+import { isRunningInExpoGo } from 'expo';
+import { Platform } from 'react-native';
 
-registerTodoWidgetHandler();
+// Expo Go에는 AndroidWidget 네이티브 모듈이 없으므로 앱 화면만 시작합니다.
+if (Platform.OS === 'android' && !isRunningInExpoGo()) {
+  const { registerTodoWidgetHandler } = require('@/widgets/todo-widget-handler') as typeof import('@/widgets/todo-widget-handler');
+  registerTodoWidgetHandler();
+}
 
-// Expo Router 진입점을 유지하면서 Android 위젯 작업도 등록합니다.
-import 'expo-router/entry';
+require('expo-router/entry');
