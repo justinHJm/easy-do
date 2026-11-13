@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "description": "Successful QA APK builds before automatic versioned artifact names. Distinct commits share a revision across branches.",
+  "builds": [
+    {
+      "version": "0.3.1",
+      "revision": 0,
+      "sha": "1c984cde10fabfcdc9a7e292cae70c70e29277b6"
+    },
+    {
+      "version": "0.3.1",
+      "revision": 1,
+      "sha": "58ce1cd57101b44b97ba0f2c06edbc5e78d9a7e1"
+    },
+    {
+      "version": "0.4.1",
+      "revision": 0,
+      "sha": "a04edce6d5200b38ffc80018304444363f3ba447"
+    },
+    {
+      "version": "0.4.1",
+      "revision": 1,
+      "sha": "bc5ff68e295133b2f9510bde6c13373d9a59b2b8"
+    },
+    {
+      "version": "0.4.1",
+      "revision": 2,
+      "sha": "12cb5587bb8162955eb7a2c8b7286da09b62d5c9"
+    }
+  ]
+}
