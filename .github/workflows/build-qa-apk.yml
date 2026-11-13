@@ -3,13 +3,21 @@ name: Build QA APK
 on:
   workflow_dispatch:
 
+# Android build steps receive read-only access; only the tag job can write.
 permissions:
   contents: read
+
+# Serialize manual builds so two different commits cannot claim the same revision.
+concurrency:
+  group: easy-do-qa-apk-versioning
+  cancel-in-progress: false
 
 jobs:
   build-qa-apk:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    outputs:
+      qa_tag: ${{ steps.qa_name.outputs.tag }}
     env:
       CI: '1'
       EASY_DO_QA: '1'
@@ -28,6 +36,10 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+
+      - name: Determine versioned QA APK name
+        id: qa_name
+        run: node scripts/qa-apk-version.mjs plan
 
       - name: Install dependencies
         run: npm ci
@@ -52,15 +64,33 @@ jobs:
         run: ./gradlew :app:assembleRelease
 
       - name: Stage QA APK
+        env:
+          QA_FILENAME: ${{ steps.qa_name.outputs.filename }}
         run: |
           test -f android/app/build/outputs/apk/release/app-release.apk
           mkdir -p artifacts
-          cp android/app/build/outputs/apk/release/app-release.apk artifacts/easy-do-qa.apk
+          cp android/app/build/outputs/apk/release/app-release.apk "artifacts/$QA_FILENAME"
 
       - name: Upload QA APK
         uses: actions/upload-artifact@v4
         with:
-          name: easy-do-qa-apk
-          path: artifacts/easy-do-qa.apk
+          name: ${{ steps.qa_name.outputs.artifact_name }}
+          path: artifacts/${{ steps.qa_name.outputs.filename }}
           if-no-files-found: error
           retention-days: 3
+
+  record-qa-revision:
+    needs: build-qa-apk
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '20'
+      - name: Record successful QA build revision
+        env:
+          QA_TAG: ${{ needs.build-qa-apk.outputs.qa_tag }}
+        run: node scripts/qa-apk-version.mjs record
