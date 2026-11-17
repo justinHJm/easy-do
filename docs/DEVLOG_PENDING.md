@@ -59,3 +59,13 @@ Git diff만으로 알기 어려운 변경 목적, 문제 원인, 실패 시도, 
 - `Build QA APK` 실행 시 `package.json` 버전과 기존 `qa/v...` 태그를 조회해 `easy-do-qa-vX.Y.Z[-N].apk`로 업로드하도록 변경. 성공한 새 빌드는 Git 태그로 저장하며 이름 결정과 기록 단계를 직렬화.
 - Android 빌드 잡의 저장소 접근은 읽기 전용으로 유지하고, 성공 후 태그 기록 잡에만 쓰기 권한 부여. 기존 QA 패키지·서명·위젯·APK 빌드 명령 및 아티팩트 3일 보관은 변경하지 않음.
 - 검증: 로컬 모의 Git 저장소에서 과거 빌드 중복 인식, 신규 수정본 +1, 새 버전 0부터 시작, 재실행 태그 재사용 확인. 워크플로 YAML 정적 확인. GitHub Actions 실제 APK 빌드·태그 푸시 및 실기기 검증 미실행.
+
+## 2026-11-17
+
+### QA 브랜치 자동 동기화·버전 시작 Skill 도입
+
+- `qa/0.4.1`을 원격 `master` 기준으로 생성하고, `master`는 수정하지 않음.
+- `AGENTS.md`, commit/build-apk Skill과 신규 `qa-sync`·`version-start` Skill로 QA 브랜치만 검증 후 자동 커밋·푸시하도록 규칙 작성. APK 빌드는 `workflow_dispatch` 수동 유지, master 병합은 승인 필요.
+- `Build QA APK`에 앱 버전과 선택한 QA 브랜치 일치 검사 추가. 기존 QA 태그·파일명·권한 분리는 유지.
+- `manage-version.cjs`에서 기존 `app.config.js`의 앱 버전 상속을 검증한 뒤 PATCH/MINOR 변경하도록 보완하고 관련 테스트 추가.
+- GitHub 변경 파일·브랜치·태그 확인 및 실제 스크립트 소스의 가상 파일시스템 PATCH/체크 검증 PASS. 로컬 Node 자동 테스트, 실기기 APK, 실제 Codex CLI Git 자동화 실행은 미검증. 로컬 미커밋 변경은 접근하지 않았음.
