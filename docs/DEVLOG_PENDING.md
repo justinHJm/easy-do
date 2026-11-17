@@ -51,6 +51,18 @@ Git diff만으로 알기 어려운 변경 목적, 문제 원인, 실패 시도, 
 - 일부 위젯 갱신 실패 시 기본 포즈 갱신을 건너뛰던 경로를 수정했다. 저장·복원, 여러 위젯 갱신, 부분 갱신 실패 뒤 복귀를 검증했다.
 - TypeScript, 서울·뉴욕 각 51개 테스트, QA Android Hermes export 통과. 수정본 APK와 실기기 검증은 미실행이다.
 
+## 2026-11-14
+
+### Android 릴리스 R8 최적화·리소스 축소
+
+- 현재 master v0.4.1의 기존 단일 에이전트 전환 미커밋 변경을 보존했다. 설치된 Expo 57.0.24 템플릿은 minify/shrink 기본 false이며 proguard-android.txt를 사용하고 있었다. 기존 Play 업로드 AAB 자체는 미분석이다.
+- SDK 57 호환 expo-build-properties 57.0.23과 필요한 schema-utils 57.0.3을 적용해 릴리스 minify/shrink를 활성화했다. 로컬 config plugin이 최적화를 막는 기본 ProGuard 파일만 optimize 버전으로 바꾸며 RN/Reanimated/Worklets keep 규칙은 유지한다.
+- RN·위젯의 이름 기반 이미지 조회를 위해 캐릭터/말풍선/위젯 폴더의 구체적인 drawable 이름만 tools:keep으로 생성한다. 코드 전체 keep 규칙을 추가하지 않았다.
+- 검증: TypeScript, Todo/저장/위젯 기존 51개 테스트(Asia/Seoul), 버전 도구 테스트, 신규 빌드 설정 회귀 테스트, Android Hermes export PASS. .expo/r8-verify에서 설치된 로컬 템플릿으로 격리 prebuild 후 실제 생성된 Gradle 속성·기본 규칙·리소스 keep·위젯 receiver 확인 PASS.
+- 설치 CLI의 동적 설정 자동 등록 제한은 app.json에 직접 등록해 해결했다. 캐시 인자 오해석으로 생긴 임시 의존성은 제거해 최종 lockfile에는 요청 패키지와 필요한 schema-utils 변경만 남겼다.
+- 미검증: Android SDK 부재로 실제 Release 컴파일·R8 실행·DEX 분석·AAB 생성 미수행. EAS 원격 빌드/서명/빌드 번호는 조회·변경하지 않았으며 버전·패키지·저장 스키마 유지, 미커밋·미푸시.
+- 다음 검증: production AAB의 minifyReleaseWithR8 및 리소스 축소 작업, mapping.txt/configuration.txt/usage.txt, DEX 크기·메서드 수·Play Console 지표 확인. 새 APK로 앱 재시작/기존 저장 복원, 여러 위젯 완료·갱신, 캐릭터/새로고침 이미지, 네이티브 전환/애니메이션 실기기 확인 필요.
+
 ## 2026-11-13
 
 ### QA APK 파일명에 버전별 수정본 번호 추가
