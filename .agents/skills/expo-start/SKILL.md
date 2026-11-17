@@ -5,7 +5,7 @@ description: Windows에서 기존 easy-do Metro를 재사용하거나 LAN/Expo G
 
 # 빠른 실행
 
-전체 탐색, verify/typecheck/lint/test/Git 검사, Reviewer, 버전/CHANGELOG 변경, 문서 재조회, 설치를 실행 전에 하지 않는다.
+전체 탐색, verify/typecheck/lint/test/Git 검사, 버전/CHANGELOG 변경, 문서 재조회, 설치를 실행 전에 하지 않는다.
 
 1. 알려진 살아 있는 프로젝트 터미널 세션이 있으면 `c`로 QR을 다시 표시한다. 캐시 삭제가 아니다.
 2. 세션을 모를 때만 알려진 포트(기본 8081)와 프로세스를 한 번 확인한다. 포트만으로 같은 앱이라고 단정하지 않는다. 필요하면 `/`에 `expo-platform: android`, `Accept: application/expo+json`을 보내 `extra.expoGo.developer.projectRoot`를 확인한다. 다른/불명확한 서버는 종료하거나 중복 실행하지 않는다.

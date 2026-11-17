@@ -2,14 +2,7 @@
 
 `AGENTS.md`는 항상 적용되는 작업 규칙의 기준이다. 이 문서는 프로젝트에서만 필요한 Codex 파일의 위치를 안내한다.
 
-## 역할 설정
-
-- `.codex/config.toml`: 하위 Agent 기본값과 동시 실행 상한
-- `.codex/agents/worker.toml`: 제한된 구현 또는 파일 변경
-- `.codex/agents/reviewer.toml`: 읽기 전용 독립 검토와 PASS/FAIL/BLOCKED 판단
-- `.codex/agents/explorer.toml`: 필요한 경우의 읽기 전용 코드 탐색
-
-작은 작업은 Manager가 직접 처리한다. Worker, Reviewer, Explorer는 작업 위험과 탐색 필요성이 있을 때만 사용한다.
+`.codex/config.toml`에서 `agents.enabled = false`로 설정해 이 프로젝트의 하위 에이전트 도구를 비활성화한다. [OpenAI Docs의 하위 에이전트 설정](https://learn.chatgpt.com/docs/agent-configuration/subagents)
 
 ## 프로젝트 Skills
 
