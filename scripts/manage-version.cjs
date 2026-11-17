@@ -5,8 +5,10 @@ const path = require('node:path');
 
 function createPlan(root, mode = 'check', reason = '', now = new Date()) {
   if (!['check', 'patch', 'minor'].includes(mode)) throw new Error('check, patch, minor만 지원합니다. MAJOR는 자동 변경하지 않습니다.');
-  if (['app.config.js', 'app.config.ts'].some((file) => fs.existsSync(path.join(root, file)))) {
-    throw new Error('동적 Expo 설정이 있습니다. 실제 앱 버전 출처를 먼저 확인하세요.');
+  // app.config.js가 app.json을 그대로 상속하면 QA 패키지명만 덮어쓸 수 있습니다.
+  // 실제 버전은 아래에서 양쪽 모드 모두 검사합니다.
+  if (fs.existsSync(path.join(root, 'app.config.ts'))) {
+    throw new Error('TypeScript 동적 Expo 설정이 있습니다. 앱 버전 출처를 먼저 확인하세요.');
   }
   const files = ['app.json', 'package.json', 'package-lock.json'];
   const sources = files.map((file) => fs.readFileSync(path.join(root, file), 'utf8'));
@@ -14,6 +16,32 @@ function createPlan(root, mode = 'check', reason = '', now = new Date()) {
   const version = app.expo?.version;
   if (typeof version !== 'string' || !/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(version)) throw new Error('앱 버전 형식을 확인하세요.');
   if ([pkg.version, lock.version, lock.packages?.['']?.version].some((v) => v !== version)) throw new Error('app/package/lock 버전이 다릅니다. 먼저 원인을 확인하세요.');
+  const configPath = path.join(root, 'app.config.js');
+  if (fs.existsSync(configPath)) {
+    const source = fs.readFileSync(configPath, 'utf8');
+    if (!/require\s*\(\s*['"]\.\/app\.json['"]\s*\)/.test(source) || !/\.\.\.app\.expo\b/.test(source)) {
+      throw new Error('알 수 없는 동적 Expo 설정입니다. 버전 출처를 확인하세요.');
+    }
+    const previousQA = process.env.EASY_DO_QA;
+    const appJsonPath = path.join(root, 'app.json');
+    try {
+      for (const qa of [false, true]) {
+        if (qa) process.env.EASY_DO_QA = '1';
+        else delete process.env.EASY_DO_QA;
+        delete require.cache[require.resolve(configPath)];
+        delete require.cache[require.resolve(appJsonPath)];
+        const effective = require(configPath);
+        if (effective?.expo?.version !== version) {
+          throw new Error('동적 Expo 설정과 app.json의 버전이 다릅니다.');
+        }
+      }
+    } finally {
+      if (previousQA === undefined) delete process.env.EASY_DO_QA;
+      else process.env.EASY_DO_QA = previousQA;
+      delete require.cache[require.resolve(configPath)];
+      delete require.cache[require.resolve(appJsonPath)];
+    }
+  }
   if (mode === 'check') return { version, nextVersion: version, changes: [] };
   const [major, minor, patch] = version.split('.').map(Number);
   if (major !== 0) throw new Error('이 자동 도구는 개발 단계 0.x.x에만 사용합니다.');

@@ -24,6 +24,15 @@ try {
   assert.equal(JSON.parse(fs.readFileSync(path.join(root, 'app.json'))).expo.android.versionCode, 42);
   assert.equal(JSON.parse(fs.readFileSync(path.join(root, 'package-lock.json'))).packages['node_modules/fixture'].version, '0.1.0');
   assert.ok(fs.readFileSync(path.join(root, 'CHANGELOG.md'), 'utf8').includes('## [0.1.1]'));
+  // app.config.js가 app.json을 상속하는 경우 PATCH/MINOR가 정상 동작해야 합니다.
+  reset();
+  originalWrite(path.join(root, 'app.config.js'), "const app = require('./app.json');\nmodule.exports = { expo: { ...app.expo, name: process.env.EASY_DO_QA === '1' ? 'easy-do QA' : 'easy-do' } };\n");
+  assert.equal(createPlan(root).version, '0.1.0');
+  applyPlan(root, createPlan(root, 'patch', 'QA config 검증'));
+  assert.equal(createPlan(root).version, '0.1.1');
+  originalWrite(path.join(root, 'app.config.js'), "const app = require('./app.json');\nmodule.exports = { expo: { ...app.expo, version: '9.9.9' } };\n");
+  assert.throws(() => createPlan(root), /동적 Expo 설정과 app.json의 버전/);
+  fs.unlinkSync(path.join(root, 'app.config.js'));
   reset(); assert.equal(createPlan(root, 'minor', '새 기능').nextVersion, '0.2.0');
   assert.throws(() => createPlan(root, 'major', '안 됨'));
   assert.throws(() => createPlan(root, 'patch', ''));
@@ -51,7 +60,7 @@ try {
   assert.throws(() => applyPlan(root, createPlan(root, 'patch', '복원 실패')), /복원 실패: package.json/);
   fs.writeFileSync = originalWrite;
   assert.equal(fs.readFileSync(path.join(root, 'app.json'), 'utf8'), originals['app.json']);
-  console.log('PASS: 미리보기·PATCH/MINOR·MAJOR 거부·일치 검사·빌드번호/의존성 보존·동시 변경·부분 쓰기 및 복원 실패');
+  console.log('PASS: 미리보기·PATCH/MINOR·동적 QA config·MAJOR 거부·일치 검사·빌드번호/의존성 보존·동시 변경·부분 쓰기 및 복원 실패');
 } finally {
   fs.writeFileSync = originalWrite;
   // 재귀 삭제는 이 테스트가 직접 만든 OS 임시 폴더에만 허용합니다.

@@ -37,6 +37,16 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      - name: Validate versioned QA branch
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          EXPECTED="refs/heads/qa/$VERSION"
+          if [ "$GITHUB_REF" != "$EXPECTED" ]; then
+            echo "::error::QA APK builds require $EXPECTED; got $GITHUB_REF"
+            exit 1
+          fi
+
       - name: Determine versioned QA APK name
         id: qa_name
         run: node scripts/qa-apk-version.mjs plan

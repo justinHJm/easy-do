@@ -17,9 +17,14 @@
 
 ## Git과 외부 변경
 
-- commit, push, tag, release, force push, 원격 변경은 각각 사용자의 명시 요청이 있을 때만 수행한다.
-- 기존 변경을 임의로 stage, reset, unstage하지 않는다.
-- 실행·검증·APK·릴리스처럼 별도 절차가 필요한 요청은 해당 Skill을 읽어 필요한 범위만 따른다.
+- `master`는 안정 브랜치다. 사용자 명시적 승인 없이 직접 commit, push, merge, rebase, reset 하지 않는다. PR 생성·병합도 별도 승인 후 수행한다.
+- 개발 기본 대상은 현재 앱 버전의 `qa/X.Y.Z` 브랜치다. 새 버전 **개발 시작** 요청 시 `version-start` Skill을 적용하며, 단순 버전 언급만으로 전환하지 않는다.
+- QA 브랜치에서 기능 구현과 필수 검증을 완료하면 Manager가 `qa-sync` Skill로 **해당 작업 변경만** 자동 커밋·푸시한다. 매번 별도 커밋·푸시 승인을 요구하지 않는다.
+- 작업 전 Git 상태와 기존 사용자 변경을 확인한다. 무관한 미커밋 변경·기존 staged 항목·untracked 파일을 자동 포함하거나 임의 변경하지 않는다.
+- 변경 소유권 불명확, 검증 실패, 원격 충돌이 있으면 자동 커밋·푸시를 중단하고 보고한다. `git add .`, `git add -A`, 강제 push, 임의 stash/reset/clean은 금지한다.
+- QA 브랜치 push는 APK 빌드를 시작하지 않는다. GitHub Actions `Build QA APK`는 사용자 명시적 요청 시에만 수동 실행한다.
+- 기존 QA 빌드 성공 후 태그 기록은 Actions의 기존 절차만 사용한다. 그 외 tag, release, 브랜치 삭제는 별도 승인 필요.
+- 실행·검증·APK·버전 전환 등 별도 절차에는 해당 Skill을 먼저 읽어 따른다.
 
 ## 개발 기록
 
